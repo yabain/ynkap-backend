@@ -2,11 +2,11 @@ import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose"
 import { Document, HydratedDocument } from "mongoose"
 
 
-export type UserDocument = HydratedDocument<User> // Un HydratedDocument est "hydraté", i.e qui a été enrichi avec les méthodes et fonctionnalités de Mongoose
+export type UserDocument = HydratedDocument<User> // Un HydratedDocument est "hydraté", i.e qu'il a été enrichi avec les méthodes et fonctionnalités de Mongoose
 
 
 @Schema()
-export class User 
+export class User extends Document
 {
 
     @Prop({unique: true})

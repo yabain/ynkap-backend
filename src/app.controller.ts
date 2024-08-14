@@ -1,12 +1,11 @@
-import { Controller, Get } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Controller, Get, Redirect, Request, UseGuards } from '@nestjs/common';
 
-@Controller()
+@Controller('')
 export class AppController {
   constructor() {}
     @Get()
     getHello(): string {
       return 'Hello World!';
     }
-  
 }
+  

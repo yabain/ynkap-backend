@@ -5,11 +5,15 @@ import { APP_GUARD } from '@nestjs/core';
 import { KeycloakAuthGuard, KeycloakResourceGuard, KeycloakRoleGuard } from './keycloak/keycloak.guard';
 import { SharedModule } from './shared/shared.module';
 import { CreateUserMiddleware } from './user/middleware/user-auth.middleware';
+import { ApplicationModule } from './application/application.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
     SharedModule,
     UserModule, 
+    ApplicationModule,
+    WalletModule
   ],
   controllers: [AppController],
   providers: [
@@ -27,10 +31,11 @@ import { CreateUserMiddleware } from './user/middleware/user-auth.middleware';
     }
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-    .apply(CreateUserMiddleware)
-    .forRoutes( { path: '/dashboard', method: RequestMethod.GET })
-  }
+export class AppModule {
+
+  // configure(consumer: MiddlewareConsumer) {
+  //   consumer
+  //   .apply(CreateUserMiddleware)
+  //   .forRoutes('*')
+  // }
 }

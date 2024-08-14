@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, NestMiddleware } from "@nestjs/common";
+import { HttpException, HttpStatus, Injectable, NestMiddleware, Request } from "@nestjs/common";
 import { UserService } from "../services/user.services";
 
 @Injectable()
@@ -6,9 +6,11 @@ export class CreateUserMiddleware implements NestMiddleware {
 
     constructor(private userService: UserService) {}
 
-    async use(req: any, res: any, next: (error?: any) => void)
+    async use(@Request() req, res: any, next: (error?: any) => void)
     {
         try {
+            
+            console.log('req :', req.user)
             const userSub = req.user.sub
 
             if(typeof userSub === 'string') {
@@ -20,7 +22,8 @@ export class CreateUserMiddleware implements NestMiddleware {
             next();
             
         } catch (error) {
-            console.log("Error :", error)
+            console.error("Error :", error);
+            next(error);
         }
 
     }
