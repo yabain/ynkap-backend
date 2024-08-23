@@ -1,97 +1,92 @@
-import { Body, ConflictException, Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Put, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Put, Req, UseInterceptors } from "@nestjs/common";
 import { ApplicationService } from "../services/application.services";
 import { CreateApplicationDto } from "../dtos/create-application.dtos";
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
 import { UpdateApplicationDTOS } from "../dtos/update-application.dtos";
-import { Types } from "mongoose";
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
+import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
+
 
 
 @Controller('applications')
+@UseInterceptors(TransformResponeInterceptor)
+@ApiTags('Applications')
 export class ApplicationController {
     constructor(private applicationService: ApplicationService){}
 
     @Post()
+    @CustomMessage('Application successfully created')
+    @ApiOperation({
+        summary: "Create a new application",
+        description: "This method creates a new application in the system"
+    })
+    @ApiResponse({status: HttpStatus.CREATED, description: "Application successfully created",})
+    @ApiResponse({status: HttpStatus.CONFLICT, description: "Application with one of the body's property already exists"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+
     async createApplication(@Body() createApplicationDto: CreateApplicationDto, @Req() req) {
 
-        let sub = req["user"]["sub"];
-        console.log('sub of the connect user: ', sub);
-        try {
-            await this.applicationService.createApplication(createApplicationDto, sub)
-            return {
-                statusCode: HttpStatus.CREATED,
-                message: "Application successfully created",
-            }
-        } catch (error) {
-            if(error instanceof ConflictException)
-                throw new HttpException(error.message, HttpStatus.CONFLICT)
-        }
-       
+        let sub = req['user']['sub'];
+        return this.applicationService.createApplication(createApplicationDto, sub);  
     }
 
     @Get()
+    @CustomMessage('List of applications successfully retrieved')
+    @ApiOperation({
+        summary: "Get all the applications of the connected user",
+        description: "This method returns the list of applications created by the logged-in user"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "List of applications for the current user"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+
     async getAllApplication(){
-        try {
-            return {
-                statusCode: HttpStatus.OK,
-                message: "List of applications for the current user: ",
-                data: await this.applicationService.getAllApplication()
-            }
-        } catch (error) {
-            if(error.code == 500)
-                throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR)
-            else{
-                console.log('the error code :', error.code);
-            }
-        }
+        return this.applicationService.getAllApplications();
     }
 
     @Get(':id')
+    @CustomMessage('Application successfully retrieved')
+    @ApiOperation({
+        summary: "Get one application by using his ID",
+        description: "This method provides details of a specific application"
+    })
+    @ApiParam({ name: 'id', description: 'ID de l\'application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiResponse({status: HttpStatus.OK, description: "Application details"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the id passed in parameter cannot be found "})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+    
     async getApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
-        try {
-            return {
-                statusCode: HttpStatus.OK,
-                message: "Application details:",
-                data: await this.applicationService.getApplicationById(id)
-            }
-        } catch (error) {
-            if(error.code == 404)
-                throw new HttpException(error.message, HttpStatus.NOT_FOUND)
-        }
-
+        return this.applicationService.getApplicationById(id);
     }
 
     @Put(':id')
-    async updateApplicationById(@Param("id", ObjectIDValidationPipe) id:any, @Body() updateApplicationDtos: UpdateApplicationDTOS){
-        try {
-            return {
-                statusCode: HttpStatus.OK,
-                message: "Application updates:",
-                data: await this.applicationService.updateApplicationById(id, updateApplicationDtos)
-            }
-        } catch (error) {
-            if(error.code == 404)
-                throw new HttpException(error.message, HttpStatus.NOT_FOUND)
-            else 
-                console.log("error: ", error);
-        }
+    @CustomMessage('Application successfuly updated')
+    @ApiOperation({
+        summary: "update one application by using his ID",
+        description: "This method updates the data in an existing application"
+    })
+    @ApiBody({ type: UpdateApplicationDTOS })
+    @ApiParam({ name: 'id', description: 'ID de l\'application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiResponse({status: HttpStatus.OK, description: "Application updates"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the id passed in parameter cannot be found "})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
+    async updateApplicationById(@Param("id", ObjectIDValidationPipe) id:any, @Body() updateApplicationDtos: UpdateApplicationDTOS){
+        return this.applicationService.updateApplicationById(id, updateApplicationDtos);
     }
 
     @Delete(':id')
+    @CustomMessage('Application successfuly deleted')
+    @ApiOperation({
+        summary: "delete one application by using his ID",
+        description: "This method deletes an application and the portfolio attached to it"
+    })
+    @ApiParam({ name: 'id', description: 'ID de l\'application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiResponse({status: HttpStatus.OK, description: "Application successfuly deleted"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the id passed in parameter cannot be found "})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+    
     async deleteApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
-        try {
-            await this.applicationService.deleteApplication(id);
-            return {
-                statusCode: HttpStatus.OK,
-                message: "Application successfuly deleted",
-            }
-        } catch (error) {
-            if(error.code == 404)
-                throw new HttpException(error.message, HttpStatus.NOT_FOUND)
-            else if(error.code == 500)
-                throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR)
-            else
-                console.log("error :", error)
-        }
+        this.applicationService.deleteApplication(id);
     }
 } 

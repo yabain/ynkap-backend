@@ -1,11 +1,14 @@
 import { Controller, Get, Redirect, Request, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('')
 export class AppController {
-  constructor() {}
+
+  version = "1.0.0"
+  constructor(private configService: ConfigService) {}
     @Get()
-    getHello(): string {
-      return 'Hello World!';
+    getMainRoad(): string {
+      return `Y-Nkap API Version ${this.configService.get<string>("NODE_ENV")} ${this.version}`;
     }
 }
   
