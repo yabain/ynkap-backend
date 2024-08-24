@@ -71,13 +71,15 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
     async deleteApplication(id){
         return this.executeWithTransaction(async (session) => {
             const application = await this.findByField({_id: id})
-
-            if(!application)
-                throw new NotFoundException(`The application with the ID ${id} cannot be found`);
+            if(!application) throw new NotFoundException(`The application with the ID ${id} cannot be found`);
             
             let wallet = await this.walletService.findOneByField({application: id});
-            if(wallet) await this.walletService.delete({application: id}, session);
-            await this.delete({_id: id}, session);
+            if(!wallet) throw new NotFoundException(`The wallet of the application with the ID: ${id} cannot be found `);
+
+            if((wallet.amount == 0)) {
+                await this.walletService.delete({application: id}, session);
+                await this.delete({_id: id}, session);
+            }
         })
     }
 }

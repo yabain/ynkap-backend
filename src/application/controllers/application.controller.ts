@@ -28,7 +28,7 @@ export class ApplicationController {
     async createApplication(@Body() createApplicationDto: CreateApplicationDto, @Req() req) {
 
         let sub = req['user']['sub'];
-        return this.applicationService.createApplication(createApplicationDto, sub);  
+        return await this.applicationService.createApplication(createApplicationDto, sub);  
     }
 
     @Get()
@@ -41,7 +41,7 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
     async getAllApplication(){
-        return this.applicationService.getAllApplications();
+        return await this.applicationService.getAllApplications();
     }
 
     @Get(':id')
@@ -56,7 +56,7 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
     
     async getApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
-        return this.applicationService.getApplicationById(id);
+        return await this.applicationService.getApplicationById(id);
     }
 
     @Put(':id')
@@ -72,7 +72,7 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
     async updateApplicationById(@Param("id", ObjectIDValidationPipe) id:any, @Body() updateApplicationDtos: UpdateApplicationDTOS){
-        return this.applicationService.updateApplicationById(id, updateApplicationDtos);
+        return await this.applicationService.updateApplicationById(id, updateApplicationDtos);
     }
 
     @Delete(':id')
@@ -87,6 +87,6 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
     
     async deleteApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
-        this.applicationService.deleteApplication(id);
+        await this.applicationService.deleteApplication(id);
     }
 } 
