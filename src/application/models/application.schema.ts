@@ -18,7 +18,7 @@ export type ApplicationDocument = HydratedDocument<Application>
     }
 })
 export class Application extends Document {
-    @Prop({ unique: true, default: "", required: true})
+    @Prop({ unique: true, required: true})
     name: string;
 
     @Prop({required: true})
