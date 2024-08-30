@@ -39,7 +39,7 @@ export abstract class DataBaseService <T extends Document>
  
     async findByField(entityObj:Record<string,any>):Promise<T[]>
     {
-        return this.entityModel.find<T>({where:entityObj}).sort({createdAt:1}).populate(this.toPopuloate).exec();
+        return this.entityModel.find<T>(entityObj).sort({createdAt:1}).populate(this.toPopuloate).exec();
     }
 
     async findOneByField(entityObj:Record<string,any>,select:Record<string,any>={}):Promise<T>
