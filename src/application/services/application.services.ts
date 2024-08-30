@@ -16,7 +16,7 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
         super(applicationModel, connection)
     }
 
-    async createApplication(createApplicationDto, sub): Promise<any> {
+    async createApplication(createApplicationDto, sub): Promise<ApplicationDocument> {
         return this.executeWithTransaction( async (session) => {
             const newApplication = this.createInstance(
                 {...createApplicationDto, 
