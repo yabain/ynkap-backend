@@ -26,9 +26,7 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
     async createApplication(@Body() createApplicationDto: CreateApplicationDto, @Req() req) {
-
-        let sub = req['user']['sub'];
-        return await this.applicationService.createApplication(createApplicationDto, sub);  
+        return await this.applicationService.createApplication(createApplicationDto, req);  
     }
 
     @Get()
@@ -40,8 +38,8 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.OK, description: "List of applications for the current user"})
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
-    async getAllApplication(){
-        return await this.applicationService.getAllApplications();
+    async getAllApplication(@Req() req: Request){
+        return await this.applicationService.getAllApplications(req);
     }
 
     @Get(':id')
@@ -55,12 +53,12 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the id passed in parameter cannot be found "})
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
     
-    async getApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
-        return await this.applicationService.getApplicationById(id);
+    async getApplicationById(@Param("id", ObjectIDValidationPipe) id:any, @Req() req: Request){
+        return await this.applicationService.getApplicationById(id, req);
     }
 
     @Put(':id')
-    @CustomMessage('Application successfuly updated')
+    @CustomMessage('Application successfully updated')
     @ApiOperation({
         summary: "update one application by using his ID",
         description: "This method updates the data in an existing application"
@@ -76,7 +74,7 @@ export class ApplicationController {
     }
 
     @Delete(':id')
-    @CustomMessage('Application successfuly deleted')
+    @CustomMessage('Application successfully deleted')
     @ApiOperation({
         summary: "delete one application by using his ID",
         description: "This method deletes an application and the portfolio attached to it"

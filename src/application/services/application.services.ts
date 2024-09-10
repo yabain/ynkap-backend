@@ -1,4 +1,4 @@
-import { ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common";
 import { DataBaseService } from "src/shared/database/database.service";
 import { Application, ApplicationDocument } from "../models/application.schema";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
@@ -16,11 +16,11 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
         super(applicationModel, connection)
     }
 
-    async createApplication(createApplicationDto, sub): Promise<ApplicationDocument> {
+    async createApplication(createApplicationDto, req): Promise<ApplicationDocument> {
         return this.executeWithTransaction( async (session) => {
             const newApplication = this.createInstance(
                 {...createApplicationDto, 
-                    user: sub, 
+                    user: req['user']['sub'], 
                     clientIdProd: uuidv6(), 
                     clientIdTest: uuidv4()
                 });
@@ -34,8 +34,8 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
         }))
     }
 
-    async getAllApplications(){
-        let applications = await this.findAll();
+    async getAllApplications(req): Promise<any[]>{
+        let applications = await this.findByField({user: req['user']['sub']});
         let walletAmounts = await this.walletService.getAmounts((applications.map((app) => app._id)));
 
         return applications.map((application) => ({
@@ -44,9 +44,9 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
         }));
     }
 
-    async getApplicationById(id){
+    async getApplicationById(id,req): Promise<any>{
         const [application, walletAmount] = await Promise.all([
-            this.findOneByField({_id: id}),
+            this.findOneByField({_id: id, user: req['user']['sub']}),
             this.walletService.getAmount(id)
         ]);
 
@@ -59,7 +59,7 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
         }
     }
 
-    async updateApplicationById(id, updateApplicationDtos){
+    async updateApplicationById(id, updateApplicationDtos): Promise<ApplicationDocument>{
        const updatedApplication = await this.update({_id: id}, updateApplicationDtos);
        
        if(!updatedApplication)
@@ -68,9 +68,9 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
        return updatedApplication;
     }
 
-    async deleteApplication(id){
+    async deleteApplication(id): Promise<any>{
         return this.executeWithTransaction(async (session) => {
-            const application = await this.findByField({_id: id})
+            const application = await this.findOneByField({_id: id})
             if(!application) throw new NotFoundException(`The application with the ID ${id} cannot be found`);
             
             let wallet = await this.walletService.findOneByField({application: id});
@@ -79,6 +79,8 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
             if((wallet.amount == 0)) {
                 await this.walletService.delete({application: id}, session);
                 await this.delete({_id: id}, session);
+            } else {
+                throw new BadRequestException(`Veuillez transférer les fonds du portefeuille de ${application.name} avant de poursuivre`)
             }
         })
     }
