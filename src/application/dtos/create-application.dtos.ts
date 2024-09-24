@@ -1,10 +1,10 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsString, IsUrl, MinLength } from "class-validator";
 
-export class CreateApplicationDto {
+export class CreateApplicationDTO {
     
     @ApiProperty({
-        description: "Nom de l'application que l'utilsateur connecté souhaite créer",
+        description: "Name of the application the logged-in user wishes to create",
         example: "Yabi",
         required:true,
         minLength: 4
@@ -14,7 +14,7 @@ export class CreateApplicationDto {
     name: string
 
     @ApiProperty({
-        description: "URL pour l'envoie des notifications sur l'état d'une transaction vers l'application crée",
+        description: "Valid URL for sending transaction status notifications to the application created",
         example: "http://yabi.com",
         required:true,
         format: 'url'

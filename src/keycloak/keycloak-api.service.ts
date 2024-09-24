@@ -1,7 +1,7 @@
 import { HttpService } from "@nestjs/axios";
 import { Injectable, Req } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { lastValueFrom, map, Observable } from "rxjs";
+import { lastValueFrom } from "rxjs";
 
 @Injectable()
 export class KeycloakApiService {
@@ -19,6 +19,7 @@ export class KeycloakApiService {
             }))
         return response.data.map(user => user.id)
     }
+
 
 }
 
