@@ -18,19 +18,19 @@ export type TicketHistoryDocument = HydratedDocument<TicketStatusHistory>
 })
 export class TicketStatusHistory extends Document {
 
-    @Prop({type: mongoose.Types.ObjectId, ref: Ticket.name})
+    @Prop({type: mongoose.Types.ObjectId, ref: Ticket.name, required: true})
     ticket: Ticket;
 
-    @Prop()
+    @Prop({required: true})
     statusBefore: string;
 
-    @Prop()
+    @Prop({required: true})
     statusAfter: string;
 
     @Prop({default: Date.now()})
     updateAt: Date;
 
-    @Prop()
+    @Prop({required: true})
     updateBy: string;
 }
 
