@@ -27,7 +27,7 @@ export class TicketStatusHistory extends Document {
     @Prop({required: true})
     statusAfter: string;
 
-    @Prop({default: Date.now()})
+    @Prop({default: () => Date.now()})
     updateAt: Date;
 
     @Prop({required: true})

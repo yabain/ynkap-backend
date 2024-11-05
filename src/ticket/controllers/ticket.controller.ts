@@ -48,7 +48,7 @@ export class TicketController {
     @Get('user/:status')
     @CustomMessage(`List of the tickets with the status specified successfully retrieved for this user`)
     @ApiOperation({
-        summary: "Get all tickets of the connected user by a specific status",
+        summary: "Get all tickets of the connected user by a specific status(the name of the status)",
         description: "This method returns a list of tickets with the status specified by the logged-in user"
     })
     @ApiResponse({status: HttpStatus.OK, description: "List of tickets with the specified status of the logged-in user"})

@@ -13,13 +13,15 @@ export class TicketHistoryService extends DataBaseService<TicketHistoryDocument>
             super(ticketHistoryModel, connection)
         }
 
-        async createHistory(ticketId, statusBefore, statusAfter, updateBy) {
+        async createHistory(ticket, statusBefore, statusAfter, updateBy) {
+            console.log(ticket)
             const history = this.createInstance({
-                ticketId,
+                ticket,
                 statusBefore,
                 statusAfter,
                 updateBy: updateBy
             })
+            console.log("history:", history)
             await history.save()
         }
 }

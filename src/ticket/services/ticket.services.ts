@@ -111,8 +111,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
 
             // On définit le tableau nous permettant de valider la transition de statut du ticket
             const allowedTransition = {
-                [TicketStatus.OPEN] : [TicketStatus.IN_PROCESS, TicketStatus.CLOSE],
-                [TicketStatus.IN_PROCESS] : [TicketStatus.SOLVE, TicketStatus.CLOSE],
+                [TicketStatus.OPEN] : [TicketStatus.IN_PROGRESS, TicketStatus.CLOSE],
+                [TicketStatus.IN_PROGRESS] : [TicketStatus.SOLVE, TicketStatus.CLOSE],
                 [TicketStatus.SOLVE] : [TicketStatus.CLOSE]
             }
     

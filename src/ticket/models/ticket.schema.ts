@@ -37,7 +37,7 @@ export class Ticket extends Document {
     @Prop({default: false})
     isDeleted: boolean;
 
-    @Prop({default: Date.now(), required: true})
+    @Prop({default: () => Date.now(), required: true})
     createdAt: Date;
 
     @Prop({required: true})
