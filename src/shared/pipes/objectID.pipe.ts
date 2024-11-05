@@ -1,12 +1,13 @@
 import { ArgumentMetadata, BadRequestException, HttpStatus, Injectable, PipeTransform } from "@nestjs/common";
-import mongoose from "mongoose";
-var ObjectId = require('mongoose').Types.ObjectId
+import { Types } from 'mongoose';
+
+const { ObjectId } = Types;
 
 @Injectable()
 export class ObjectIDValidationPipe implements PipeTransform {
-    transform(value: any, metadata: ArgumentMetadata) {
+    transform(value: string, metadata: ArgumentMetadata): Types.ObjectId {
         if(ObjectId.isValid(value))
-            return new mongoose.Types.ObjectId(value);
+            return new Types.ObjectId(value);
         else {
             throw new BadRequestException({
                 statusCode: HttpStatus.BAD_REQUEST,

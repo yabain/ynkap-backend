@@ -54,6 +54,10 @@ export abstract class DataBaseService <T extends Document>
     {
         return this.entityModel.findOneAndUpdate<T>(filter,toUpdate,{session,new:true});
     }
+    
+    async updateMany(filter:Record<string,any>, toUpdate: Record<string,any>, session=null): Promise<any> {
+        return this.entityModel.updateMany<any>(filter, toUpdate, {session,new:true});
+    }
 
     async delete(filter,session=null)
     {
