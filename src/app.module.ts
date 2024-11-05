@@ -9,6 +9,8 @@ import { WalletModule } from './wallet/wallet.module';
 import { TicketModule } from './ticket/ticket.module';
 import { GatewayModule } from './chat-gateway/gateway.module';
 import { MessageModule } from './message/message.module';
+import { NotificationModule } from './notifications/notification.module';
+import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 
 @Module({
   imports: [
@@ -18,7 +20,9 @@ import { MessageModule } from './message/message.module';
     WalletModule,
     MessageModule,
     TicketModule,
-    GatewayModule
+    GatewayModule,
+    PaymentMethodsModule,
+    NotificationModule
   ],
   controllers: [AppController],
   providers: [
