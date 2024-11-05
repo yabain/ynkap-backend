@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Document } from "mongoose";
+import mongoose, { HydratedDocument, Document } from "mongoose";
 import { PrivateKey } from "../enums/privateKey.enum";
+import { PaymentMethod } from "src/payment-methods/models/payment-method.model";
 
 
 export type ApplicationDocument = HydratedDocument<Application>
@@ -24,7 +25,7 @@ export class Application extends Document {
     @Prop({required: true})
     user: string;
 
-    @Prop({unique: true, required: true})
+    @Prop({required: true})
     urlToCallback: string;
 
     @Prop({unique: true, default: ""})
@@ -39,6 +40,9 @@ export class Application extends Document {
     @Prop({default: PrivateKey.TEST})
     privateKeytest: string;
 
+    @Prop({type: [{type: mongoose.Schema.Types.ObjectId, ref: PaymentMethod.name}], default:[]})
+    paymentMethods: PaymentMethod[];
+
     @Prop({default: false})
     envProd: boolean;
 
@@ -48,7 +52,7 @@ export class Application extends Document {
     @Prop({default: false})
     isDeleted: boolean;
     
-    @Prop({default: Date.now(), required: true})
+    @Prop({default: () => Date.now(), required: true})
     createdAt: Date;
 }
 

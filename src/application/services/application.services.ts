@@ -13,7 +13,7 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
         @InjectConnection() connection: Connection,
         private walletService: WalletServices
     ){
-        super(applicationModel, connection)
+        super(applicationModel, connection, ['paymentMethods'])
     }
 
     async createApplication(createApplicationDto, req): Promise<ApplicationDocument> {

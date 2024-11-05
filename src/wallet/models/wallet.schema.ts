@@ -26,7 +26,7 @@ export class Wallet extends Document {
     @Prop({default: false})
     isDeleted: boolean;
 
-    @Prop({default: Date.now(), required: true})
+    @Prop({default: () => Date.now(), required: true})
     createdAt: Date;
 
 }
