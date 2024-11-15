@@ -1,0 +1,6 @@
+
+export enum TicketNotification {
+    NEW_TICKET = "NEW_TICKET",
+    STATUT_TICKET_CHANGE = "STATUT_TICKET_CHANGE",
+    TICKET_SOLVE = "TICKET_SOLVE"
+}

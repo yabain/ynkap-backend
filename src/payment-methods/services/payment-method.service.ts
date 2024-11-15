@@ -49,7 +49,6 @@ export class PaymentMethodService extends DataBaseService<PaymentMethodDocument>
             if(!application) throw new NotFoundException(`the application with the id '${id}' cannot be found`)
 
             //On se rassure que les moyens de paiements que l'utilisateur souhaite ajoutés existe effectivement dans la base de données
-            //Et on retourne les identifiants de chaque méthode de paiement, ceux ci seront utiles pour s'assurer que les moyens de paiements à ajoutés ne soient pas en doublons
             let paymentMethods = await this.findByField({_id: {$in: updatePaymentMethodsTableDto.paymentMethods} });
             if(paymentMethods.length !== updatePaymentMethodsTableDto.paymentMethods.length)
                 throw new NotFoundException('Some of the payment method passed cannot be founded');
