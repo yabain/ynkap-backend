@@ -28,7 +28,7 @@ async function bootstrap() {
     .setTitle('Y-nkap API Documentation')
     .setDescription('Plateforme de paiement en ligne')
     .setVersion('1.0')
-    .addTag('Applications', 'Tickets')
+    .addTag('Y-Nkap')
     .build();
 
     const document = SwaggerModule.createDocument(app,config)

@@ -1,0 +1,4 @@
+export const ERROR_CODE = {
+    RESSOURCE_NOT_FOUND_ERROR: -100,
+    UNKNOW_ERROR: -101
+}

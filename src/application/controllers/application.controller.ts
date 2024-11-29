@@ -6,7 +6,7 @@ import { UpdateApplicationDTO } from "../dtos/update-application.dtos";
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
 import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
-
+import { Request } from "express"
 
 
 @Controller('applications')

@@ -9,8 +9,10 @@ import { WalletModule } from './wallet/wallet.module';
 import { TicketModule } from './ticket/ticket.module';
 import { GatewayModule } from './chat-gateway/gateway.module';
 import { MessageModule } from './message/message.module';
-import { NotificationModule } from './notifications/notification.module';
+// import { NotificationModule } from './notifications/notification.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
+import { FinancialTransactionModule } from './financial-transaction/financial-transaction.module';
+import { FinancialPaymentModule } from './financial-payment/financial-payment.module';
 
 @Module({
   imports: [
@@ -22,7 +24,9 @@ import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
     TicketModule,
     GatewayModule,
     PaymentMethodsModule,
-    NotificationModule
+    FinancialTransactionModule,
+    FinancialPaymentModule
+    // NotificationModule
   ],
   controllers: [AppController],
   providers: [
