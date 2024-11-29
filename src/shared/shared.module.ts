@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import configuration from "./conf/configuration";
+import configuration from "./config/configuration";
 import { MongooseModule } from "@nestjs/mongoose";
 import { KeycloakModule } from "src/keycloak/keycloak.module";
 

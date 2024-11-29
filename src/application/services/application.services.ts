@@ -4,14 +4,14 @@ import { Application, ApplicationDocument } from "../models/application.schema";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
 import { Connection, Model } from "mongoose";
 import { v6 as uuidv6, v4 as uuidv4} from 'uuid'
-import { WalletServices } from "src/wallet/services/wallet.services";
+import { WalletService } from "src/wallet/services";
 
 @Injectable()
 export class ApplicationService extends DataBaseService<ApplicationDocument> {
     constructor(
         @InjectModel(Application.name) private applicationModel: Model<ApplicationDocument>,
         @InjectConnection() connection: Connection,
-        private walletService: WalletServices
+        private walletService: WalletService
     ){
         super(applicationModel, connection, ['paymentMethods'])
     }

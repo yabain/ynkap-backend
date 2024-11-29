@@ -6,6 +6,8 @@ import { TransformResponeInterceptor } from "src/shared/interceptors/transform-r
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
 import { UpdateStatusTicketDTO } from "../dtos/update-status-ticket.dto";
 import { TicketTypes } from "../enums/ticket-types.enum";
+import { Request } from "express"
+
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 
 @Controller('tickets')
