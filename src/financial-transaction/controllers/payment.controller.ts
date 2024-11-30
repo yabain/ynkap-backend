@@ -40,9 +40,9 @@ export class PaymentController
                 "token": "MP2411294652097496B00B0AA307",
                 "error": 0,
                 "paymentMode": "ORANGE",
-                "application": "6749689642bafee2045b382c",
+                "application": "877e54ara454fa54reedf4",
                 "moneyCode": "XAF",
-                "wallet": "6749689642bafee2045b382e",
+                "wallet": "7d7878e8787d87ez8787d7878d",
                 "createdAt": "2024-11-29T09:43:32.564Z",
                 "startDate": "2024-11-29T09:46:29.877Z",
                 "endDate": "2024-11-29T09:46:29.877Z"
@@ -53,7 +53,7 @@ export class PaymentController
         example: 
         {
             "statusCode": 404,
-            "message": "APP id 6749689642bafee2045b382b not found",
+            "message": "APP id 7d7878e8787d87ez8787d7878d not found",
             "data": null,
             "timestamp": "2024-11-29T09:56:00.254Z"
         }
@@ -115,7 +115,7 @@ export class PaymentController
                 "token": "MP241129870A5D7CB34E6E63F86C",
                 "error": -207,
                 "paymentMode": "ORANGE",
-                "application": "6749689642bafee2045b382c",
+                "application": "7d7878e8787d87ez8787d7878d",
                 "moneyCode": "XAF",
                 "wallet": "6749689642bafee2045b382e",
                 "createdAt": "2024-11-29T07:37:32.808Z",
