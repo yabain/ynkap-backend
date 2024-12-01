@@ -3,7 +3,7 @@ export default () => ({
     mongoURI: process.env.MONGO_DATABASE_URL,
     NODE_ENV:process.env.NODE_ENV,
     KEYCLOAK_SERVER_URI: process.env.KEYCLOAK_SERVER_URI,
-    HOST_URL: process.env.HOST_URL,
+    HOST_URL: "https://ynkap-api.yaba-in.com",
     //MOMO API
     MOMO_API_DEFAULT_UUID:process.env.MOMO_API_DEFAULT_UUID,  
     MOMO_API_PRIMARY_KEY:process.env.MOMO_API_PRIMARY_KEY,   
