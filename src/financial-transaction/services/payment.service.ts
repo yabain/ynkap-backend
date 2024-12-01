@@ -12,6 +12,8 @@ import { StrategyResponseStatus } from "src/financial-payment/strategies/strateg
 import { FinancialTransactionDocument } from "../models";
 import { UtilStrategyFunc } from "src/financial-payment/strategies/util-strategy-func";
 import { ERROR_CODE } from "src/shared/config/errors";
+import { ApplicationService } from "src/application/services";
+import { HttpService } from "@nestjs/axios";
 
 @Injectable()
 export class PaymentService
@@ -21,6 +23,8 @@ export class PaymentService
         private walletService:WalletService,
         private financialTransactionService:FinancialTransactionService,
         private configServie:ConfigService,
+        private applicationService:ApplicationService,
+        private readonly httpService:HttpService,
         @InjectConnection() private readonly connection:mongoose.Connection
     ){}
 
@@ -100,7 +104,7 @@ export class PaymentService
 
     async updatePayementStatus(payToken:string,status:string)
     {
-        let transaction = await this.connection.startSession(),financialTransaction=null;
+        let transaction = await this.connection.startSession(),financialTransaction:FinancialTransactionDocument=null;
         transaction.startTransaction();
         try {
             financialTransaction=await this.financialTransactionService.findOneByField({token:payToken})
@@ -122,6 +126,18 @@ export class PaymentService
 
             if(financialTransaction.state==FinancialTransactionState.FINANCIAL_TRANSACTION_SUCCESS) await this.updateWallet(financialTransaction,transaction)
             await transaction.commitTransaction();
+            if(financialTransaction.application.urlToCallback)
+            {
+                this.httpService.request({
+                    url:financialTransaction.application.urlToCallback,
+                    method:"post",
+                    headers:{
+                        'Content-Type': 'application/json',
+                    },
+                    data:financialTransaction
+                })
+                .subscribe(()=> {})
+            }
         } 
         catch(err)
         {
@@ -135,6 +151,7 @@ export class PaymentService
         {
             transaction.endSession();
         }   
+
     }
 
     async updateWallet(financialTransaction,transaction=null)

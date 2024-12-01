@@ -7,13 +7,15 @@ import { PaymentController, PaymentHistoryController } from "./controllers";
 import { FinancialTransaction, FinancialTransactionSchema } from "./models";
 import { FinancialTransactionService, PaymentService } from "./services";
 import { DecreaseAmountValidator } from "./validators";
+import { HttpModule } from "@nestjs/axios";
 
 @Module({
     imports:[
         MongooseModule.forFeature([{name:FinancialTransaction.name,schema:FinancialTransactionSchema}]),
         ApplicationModule,
         FinancialPaymentModule,
-        WalletModule
+        WalletModule,
+        HttpModule
     ],
     controllers:[PaymentController, PaymentHistoryController],
     providers:[
