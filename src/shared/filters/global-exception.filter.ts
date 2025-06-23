@@ -2,32 +2,42 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { Response } from 'express'
 
 @Catch() 
-//On ne spécifie pas de paramètre donc elle interceptera toutes les exceptions
 export class GlobalExceptionFilter implements ExceptionFilter {
     catch(exception: unknown, host: ArgumentsHost) {
-    // La méthode catch traite l'exception interceptée, 
-    // 'unknown' pour que des vérifications soient faites avant de manipuler l'objet 'exception'
-    // 'host' fournit un contexte d'execution permettant d'accéder aux détails spécifiques à l'environement dans lequel l'exeption s'est produite
-
         const ctx = host.switchToHttp();
-        //Convertit le contexte global en un contexte HTTP pour accéder aux objets spécifiques à ce protocole (ex: requête, response)
         const response = ctx.getResponse<Response>();
-       
-        let status = HttpStatus.INTERNAL_SERVER_ERROR;
-        let message = 'An internal error has occurred';
-        let data = null;
+        
+        // Vérifier si la réponse a déjà été envoyée
+        if (response.headersSent) {
+            console.error('Headers already sent, cannot send error response:', exception);
+            return;
+        }
 
-        if(exception instanceof HttpException) {
-            status = exception.getStatus()
+        let status = HttpStatus.INTERNAL_SERVER_ERROR;
+        let message = 'Internal server error';
+        let error = 'Internal Server Error';
+
+        if (exception instanceof HttpException) {
+            status = exception.getStatus();
             const exceptionResponse = exception.getResponse();
-            message = typeof exceptionResponse === 'string' ? exceptionResponse : (exceptionResponse as any).message || message;
+            
+            if (typeof exceptionResponse === 'object') {
+                message = (exceptionResponse as any).message || message;
+                error = (exceptionResponse as any).error || error;
+            } else {
+                message = exceptionResponse;
+            }
+        } else if (exception instanceof Error) {
+            message = exception.message;
+            error = exception.name;
         }
 
         response.status(status).json({
             statusCode: status,
-            message: message,
-            data: data,
-            timestamp: new Date().toISOString()
-       })
+            error: error,
+            message: Array.isArray(message) ? message : [message],
+            timestamp: new Date().toISOString(),
+            path: ctx.getRequest<Request>().url
+        });
     }
 }

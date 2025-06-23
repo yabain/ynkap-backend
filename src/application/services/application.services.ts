@@ -1,87 +1,183 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common";
-import { DataBaseService } from "src/shared/database/database.service";
-import { Application, ApplicationDocument } from "../models/application.schema";
-import { InjectConnection, InjectModel } from "@nestjs/mongoose";
-import { Connection, Model } from "mongoose";
-import { v6 as uuidv6, v4 as uuidv4} from 'uuid'
-import { WalletService } from "src/wallet/services";
+    import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+    import { DataBaseService } from "src/shared/database/database.service";
+    import { Application, ApplicationDocument } from "../models/application.schema";
+    import { InjectConnection, InjectModel } from "@nestjs/mongoose";
+    import { Connection, Model } from "mongoose";
+    import { v4 as uuidv4, v6 as uuidv6 } from 'uuid';
+    import * as crypto from 'crypto';
+    import { WalletService } from "src/wallet/services";
 
-@Injectable()
-export class ApplicationService extends DataBaseService<ApplicationDocument> {
-    constructor(
-        @InjectModel(Application.name) private applicationModel: Model<ApplicationDocument>,
-        @InjectConnection() connection: Connection,
-        private walletService: WalletService
-    ){
-        super(applicationModel, connection, ['paymentMethods'])
-    }
+    @Injectable()
+    export class ApplicationService extends DataBaseService<ApplicationDocument> {
+        constructor(
+            @InjectModel(Application.name) private applicationModel: Model<ApplicationDocument>,
+            @InjectConnection() connection: Connection,
+            private walletService: WalletService
+        ){
+            super(applicationModel, connection, ['paymentMethods'])
+        }
 
-    async createApplication(createApplicationDto, req): Promise<ApplicationDocument> {
-        return this.executeWithTransaction( async (session) => {
-            const newApplication = this.createInstance(
-                {...createApplicationDto, 
-                    user: req['user']['sub'], 
-                    clientIdProd: uuidv6(), 
-                    clientIdTest: uuidv4()
+        async createApplication(createApplicationDto, req): Promise<ApplicationDocument> {
+            console.log('Début de création d\'application:', createApplicationDto);
+            console.log('Utilisateur de la requête:', req.user);
+            
+            return this.executeWithTransaction(async (session) => {
+                try {
+                    // Génération de clés sécurisées
+                    const clientIdProd = uuidv6();
+                    const clientIdTest = uuidv4();
+                    const privateKeyProd = this.generateSecureKey();
+                    const privateKeyTest = this.generateSecureKey();
+                    
+                    console.log('Clés générées:', { clientIdProd, clientIdTest });
+                    
+                    // Vérifier que l'utilisateur est présent
+                    if (!req.user || !req.user.sub) {
+                        console.error('Utilisateur non trouvé dans la requête:', req.user);
+                        throw new Error('Utilisateur non authentifié ou ID utilisateur manquant');
+                    }
+                    
+                    const newApplication = this.createInstance({
+                        ...createApplicationDto, 
+                        user: req.user.sub, 
+                        clientIdProd, 
+                        clientIdTest,
+                        privateKeyProd,
+                        privateKeyTest // Correction de la casse (privateKeytest -> privateKeyTest)
+                    });
+                    
+                    console.log('Nouvelle application créée:', newApplication);
+                    
+                    await newApplication.save({session});
+                    console.log('Application sauvegardée avec ID:', newApplication._id);
+                    
+                    const wallet = await this.walletService.create({application: newApplication._id}, session);
+                    console.log('Portefeuille créé:', wallet);
+                    
+                    return newApplication;
+                } catch (error) {
+                    console.error('Erreur lors de la création de l\'application:', error);
+                    throw error;
+                }
+            }).catch((error) => {
+                console.error('Erreur capturée dans executeWithTransaction:', error);
+                if (error.code == 11000)
+                    throw new ConflictException(`Une application avec le champ ${Object.keys(error.keyPattern)[0]} existe déjà`);
+                throw error;
+            });
+        }
+
+        // Méthode pour générer une clé secrète sécurisée
+        private generateSecureKey(): string {
+            // Génère une clé de 32 caractères hexadécimaux (128 bits)
+            return crypto.randomBytes(32).toString('hex');
+        }
+
+        // Ajout d'une méthode pour régénérer les clés
+        async regenerateKeys(appId: string, environment: 'prod' | 'test', req): Promise<ApplicationDocument> {
+            return this.executeWithTransaction(async (session) => {
+                const app = await this.findById(appId, session);
+                
+                if (!app) {
+                    throw new NotFoundException(`Application with ID ${appId} not found`);
+                }
+                
+                // Vérifier que l'utilisateur est le propriétaire de l'application
+                if (app.user !== req['user']['sub']) {
+                    throw new ForbiddenException('You do not have permission to regenerate keys for this application');
+                }
+                
+                const updateData: any = {};
+                
+                if (environment === 'prod') {
+                    updateData.clientIdProd = uuidv6();
+                    updateData.privateKeyProd = this.generateSecureKey();
+                } else {
+                    updateData.clientIdTest = uuidv4();
+                    updateData.privateKeytest = this.generateSecureKey();
+                }
+                
+                const updatedApp = await this.update({ _id: appId }, updateData, session);
+                return updatedApp;
+            });
+        }
+
+        async getAllApplications(req): Promise<any[]>{
+            console.log('Service: Récupération des applications pour l\'utilisateur:', req['user']?.sub);
+            
+            if (!req['user'] || !req['user']['sub']) {
+                console.error('Utilisateur non trouvé dans la requête:', req['user']);
+                throw new Error('Utilisateur non authentifié ou ID utilisateur manquant');
+            }
+            
+            try {
+                let applications = await this.findByField({user: req['user']['sub']});
+                console.log(`${applications.length} applications trouvées en base de données`);
+                
+                if (applications.length === 0) {
+                    console.log('Aucune application trouvée pour cet utilisateur');
+                    return [];
+                }
+                
+                console.log('IDs des applications trouvées:', applications.map(app => app._id));
+                
+                let walletAmounts = await this.walletService.getAmounts((applications.map((app) => app._id)));
+                console.log('Montants des portefeuilles récupérés:', walletAmounts);
+
+                return applications.map((application) => {
+                    const appObj = application.toObject();
+                    const walletAmount = walletAmounts.get(application._id.toString());
+                    console.log(`Application ${application._id}: montant du portefeuille =`, walletAmount);
+                    
+                    return {
+                        ...appObj,
+                        walletAmount: walletAmount
+                    };
                 });
-            await newApplication.save({session});
-            await this.walletService.create({application: newApplication._id}, session)
-            return newApplication;
-        }).catch((error => {
-            if (error.code == 11000)
-                throw new ConflictException(`une application avec le champ ${Object.keys(error.keyPattern)[0]} existe déjà`)
-            throw error;
-        }))
-    }
+            } catch (error) {
+                console.error('Erreur dans getAllApplications:', error);
+                throw error;
+            }
+        }
 
-    async getAllApplications(req): Promise<any[]>{
-        let applications = await this.findByField({user: req['user']['sub']});
-        let walletAmounts = await this.walletService.getAmounts((applications.map((app) => app._id)));
+        async getApplicationById(id,req): Promise<any>{
+            const [application, walletAmount] = await Promise.all([
+                this.findOneByField({_id: id, user: req['user']['sub']}),
+                this.walletService.getAmount(id)
+            ]);
 
-        return applications.map((application) => ({
-            ...application.toObject(),
-            walletAmount: walletAmounts.get(application._id.toString())
-        }));
-    }
+            if(!application)
+                throw new NotFoundException(`The application with the ID ${id} cannot be found`);
 
-    async getApplicationById(id,req): Promise<any>{
-        const [application, walletAmount] = await Promise.all([
-            this.findOneByField({_id: id, user: req['user']['sub']}),
-            this.walletService.getAmount(id)
-        ]);
+            return {
+                ...application.toObject(),
+                walletAmount: walletAmount.amount
+            }
+        }
 
-        if(!application)
+        async updateApplicationById(id, updateApplicationDtos): Promise<ApplicationDocument>{
+        const updatedApplication = await this.update({_id: id}, updateApplicationDtos);
+        
+        if(!updatedApplication)
             throw new NotFoundException(`The application with the ID ${id} cannot be found`);
+        
+        return updatedApplication;
+        }
 
-        return {
-            ...application.toObject(),
-            walletAmount: walletAmount.amount
+        async deleteApplication(id): Promise<any>{
+            return this.executeWithTransaction(async (session) => {
+                const application = await this.findOneByField({_id: id})
+                if(!application) throw new NotFoundException(`The application with the ID ${id} cannot be found`);
+                
+                let wallet = await this.walletService.findOneByField({application: id});
+                if(!wallet) throw new NotFoundException(`The wallet of the application with the ID: ${id} cannot be found `);
+
+                if((wallet.amount == 0)) {
+                    await this.walletService.delete({application: id}, session);
+                    await this.delete({_id: id}, session);
+                } else {
+                    throw new BadRequestException(`Veuillez transférer les fonds du portefeuille de ${application.name} avant de poursuivre`)
+                }
+            })
         }
     }
-
-    async updateApplicationById(id, updateApplicationDtos): Promise<ApplicationDocument>{
-       const updatedApplication = await this.update({_id: id}, updateApplicationDtos);
-       
-       if(!updatedApplication)
-        throw new NotFoundException(`The application with the ID ${id} cannot be found`);
-       
-       return updatedApplication;
-    }
-
-    async deleteApplication(id): Promise<any>{
-        return this.executeWithTransaction(async (session) => {
-            const application = await this.findOneByField({_id: id})
-            if(!application) throw new NotFoundException(`The application with the ID ${id} cannot be found`);
-            
-            let wallet = await this.walletService.findOneByField({application: id});
-            if(!wallet) throw new NotFoundException(`The wallet of the application with the ID: ${id} cannot be found `);
-
-            if((wallet.amount == 0)) {
-                await this.walletService.delete({application: id}, session);
-                await this.delete({_id: id}, session);
-            } else {
-                throw new BadRequestException(`Veuillez transférer les fonds du portefeuille de ${application.name} avant de poursuivre`)
-            }
-        })
-    }
-}

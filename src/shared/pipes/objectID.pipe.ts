@@ -1,18 +1,12 @@
-import { ArgumentMetadata, BadRequestException, HttpStatus, Injectable, PipeTransform } from "@nestjs/common";
-import { Types } from 'mongoose';
-
-const { ObjectId } = Types;
+import { PipeTransform, Injectable, ArgumentMetadata, BadRequestException } from '@nestjs/common';
+import mongoose from 'mongoose';
 
 @Injectable()
-export class ObjectIDValidationPipe implements PipeTransform {
-    transform(value: string, metadata: ArgumentMetadata): Types.ObjectId {
-        if(ObjectId.isValid(value))
-            return new Types.ObjectId(value);
-        else {
-            throw new BadRequestException({
-                statusCode: HttpStatus.BAD_REQUEST,
-                message: "INVALID ID"
-            })
-        }
+export class ObjectIDValidationPipe implements PipeTransform<string, string> {
+  transform(value: string, metadata: ArgumentMetadata): string {
+    if (!mongoose.Types.ObjectId.isValid(value)) {
+      throw new BadRequestException(`${metadata.data} must be a valid MongoDB ObjectID`);
     }
+    return value;
+  }
 }

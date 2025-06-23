@@ -75,6 +75,13 @@ export class CreateFinancialTransactionDTO
     @IsString({message:"ID de l'application non fournis"})
     appID:string
 
+    @ApiProperty({
+        description:"Identifiant de l'utilisateur qui effectue la transaction"
+    })
+    @IsOptional()
+    @IsString()
+    userId?: string;
+
     //Invalidate
     application:Application;
 

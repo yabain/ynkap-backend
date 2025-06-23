@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Put, Req, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, HttpStatus, NotFoundException, Param, Post, Put, Req, UnauthorizedException, UseInterceptors } from "@nestjs/common";
 import { ApplicationService } from "../services/application.services";
 import { CreateApplicationDTO } from "../dtos/create-application.dtos";
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
@@ -6,14 +6,13 @@ import { UpdateApplicationDTO } from "../dtos/update-application.dtos";
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
 import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
-import { Request } from "express"
-
+import { Request } from "express";
 
 @Controller('applications')
-@UseInterceptors(TransformResponeInterceptor)
 @ApiTags('Applications')
+@UseInterceptors(TransformResponeInterceptor)
 export class ApplicationController {
-    constructor(private applicationService: ApplicationService){}
+    constructor(private readonly applicationService: ApplicationService) {}
 
     @Post()
     @CustomMessage('Application successfully created')
@@ -27,7 +26,17 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
     async createApplication(@Body() createApplicationDto: CreateApplicationDTO, @Req() req) {
-        return await this.applicationService.createApplication(createApplicationDto, req);  
+        console.log('Requête de création d\'application reçue:', createApplicationDto);
+        console.log('Informations utilisateur:', req.user);
+        
+        try {
+            const result = await this.applicationService.createApplication(createApplicationDto, req);
+            console.log('Application créée avec succès:', result);
+            return result;
+        } catch (error) {
+            console.error('Erreur lors de la création de l\'application:', error);
+            throw error;
+        }
     }
 
     @Get()
@@ -41,7 +50,21 @@ export class ApplicationController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
     async getAllApplication(@Req() req: Request){
-        return await this.applicationService.getAllApplications(req);
+        console.log('Récupération de toutes les applications pour l\'utilisateur:', req['user'] ? req['user']['sub'] : 'non authentifié');
+        
+        // Vérifier si l'utilisateur est authentifié
+        if (!req['user'] || !req['user']['sub']) {
+            throw new UnauthorizedException('Utilisateur non authentifié ou ID utilisateur manquant');
+        }
+        
+        try {
+            const applications = await this.applicationService.getAllApplications(req);
+            console.log(`${applications.length} applications trouvées`);
+            return applications;
+        } catch (error) {
+            console.error('Erreur lors de la récupération des applications:', error);
+            throw error;
+        }
     }
 
     @Get(':id')
@@ -92,4 +115,65 @@ export class ApplicationController {
     async deleteApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
         await this.applicationService.deleteApplication(id);
     }
-} 
+
+    @Post(':id/regenerate-keys')
+    @ApiOperation({ summary: 'Regenerate API keys for an application' })
+    @ApiParam({ name: 'id', description: 'Application ID' })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                environment: {
+                    type: 'string',
+                    enum: ['prod', 'test'],
+                    description: 'Environment for which to regenerate keys'
+                }
+            },
+            required: ['environment']
+        }
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Keys regenerated successfully"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Application not found"})
+    @ApiResponse({status: HttpStatus.FORBIDDEN, description: "User does not have permission to regenerate keys"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    async regenerateKeys(
+        @Param('id') id: string,
+        @Body('environment') environment: 'prod' | 'test',
+        @Req() req
+    ) {
+        return await this.applicationService.regenerateKeys(id, environment, req);
+    }
+
+    @Get(':id/credentials')
+    @ApiOperation({ summary: 'Get application credentials' })
+    @ApiParam({ name: 'id', description: 'Application ID' })
+    @ApiResponse({status: HttpStatus.OK, description: "Credentials retrieved successfully"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Application not found"})
+    @ApiResponse({status: HttpStatus.FORBIDDEN, description: "User does not have permission to view credentials"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    async getCredentials(@Param('id') id: string, @Req() req) {
+        const app = await this.applicationService.findById(id, null);
+        
+        if (!app) {
+            throw new NotFoundException(`Application with ID ${id} not found`);
+        }
+        
+        // Vérifier que l'utilisateur est le propriétaire de l'application
+        if (app.user !== req['user']['sub']) {
+            throw new ForbiddenException('You do not have permission to view credentials for this application');
+        }
+        
+        return {
+            production: {
+                clientId: app.clientIdProd,
+                privateKey: app.privateKeyProd,
+                active: app.envProd
+            },
+            test: {
+                clientId: app.clientIdTest,
+                privateKey: app.privateKeytest,
+                active: app.envTest
+            }
+        };
+    }
+}

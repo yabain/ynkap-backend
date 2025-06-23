@@ -38,13 +38,13 @@ export class OrangeMoneyStrategyPayment implements PaymentMethodStrategy
 
 
     buy(financialTransaction: FinancialTransaction): Promise<any> {
-        // console.log("Financial ",financialTransaction)
         return new Promise((resolve,reject)=>{
+            console.log("Starting Orange Money payment for transaction:", financialTransaction.ref);
             let token="";
             this.getToken()
             .then((result)=>{
                 token = result;
-                let mPayToken = ""
+                let mPayToken = "";
                 
                 this.httpService.request({
                     url:`${this.configService.get<string>("OM_API_PATH")}/omcoreapis/1.0.2/mp/init`,
@@ -56,6 +56,7 @@ export class OrangeMoneyStrategyPayment implements PaymentMethodStrategy
                     .pipe(
                         switchMap((result)=>{
                             mPayToken = result.data.data.payToken;
+                            console.log("Orange Money payment initialized with token:", mPayToken);
 
                             return this.httpService.request(
                             {
@@ -69,33 +70,42 @@ export class OrangeMoneyStrategyPayment implements PaymentMethodStrategy
                                     "notifUrl":`${this.configService.get("HOST_URL")}/payment/orange-money-notify-payment`,
                                     "channelUserMsisdn":this.configService.get("OM_API_CHANNELUSERMSISDN"),
                                     "amount": `${financialTransaction.amount}`,
-                                    "subscriberMsisdn":financialTransaction.userRef.account,
+                                    "subscriberMsisdn":financialTransaction.phoneNumber,
                                     "pin":this.configService.get("OM_API_PIN"),
                                     "orderId": financialTransaction.ref,
-                                    "description":financialTransaction.raison,
+                                    "description":financialTransaction.description,
                                     "payToken":result.data.data.payToken
                                 }
                             })
                         })
                     )
-                .subscribe(
-                    (data)=>{
-                        console.log("data ",data.data)
-                        resolve({ error:FinancialTransactionErrorType.NO_ERROR,token:mPayToken })
+                .subscribe({
+                    next: (data)=>{
+                        console.log("Orange Money payment initiated successfully");
+                        resolve({ error:FinancialTransactionErrorType.NO_ERROR, token:mPayToken });
                     },
-                    (error)=>{
-                        console.log("Error ",error)
-                        // console.log("OM Response Data",error.response.data)
-                        if(error.response.data && error.response.data.data.status=="FAILED")
-                        {
-                            return resolve({error:FinancialTransactionErrorType.INSUFFICIENT_AMOUNT_ERROR})
+                    error: (error)=>{
+                        console.error("Orange Money payment error:", error?.response?.data || error.message);
+                        
+                        if(error.response?.data && error.response.data.data?.status=="FAILED") {
+                            return resolve({error:FinancialTransactionErrorType.INSUFFICIENT_AMOUNT_ERROR});
                         }
-                        reject(error)
+                        
+                        if(error.response?.status === 400) {
+                            if(error.response.data?.message?.includes("INVALID_ACCOUNT")) {
+                                return resolve({error:FinancialTransactionErrorType.INVALID_PHONE_NUMBER});
+                            }
+                        }
+                        
+                        resolve({error:FinancialTransactionErrorType.UNKNOW_ERROR});
                     }
-                )
+                });
             })
-            .catch((error)=>  reject(error))
-        }) 
+            .catch((error)=> {
+                console.error("Orange Money token error:", error);
+                reject(error);
+            });
+        });
     }
 
     openUserPrompt(financialTransaction)

@@ -1,21 +1,28 @@
-import { Body, Controller, Post, UseGuards,Req, HttpStatus, Get, Param, ParseUUIDPipe, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Post, UseGuards, Req, HttpStatus, Get, Param, ParseUUIDPipe, UseInterceptors, NotFoundException } from "@nestjs/common";
 import { Request } from "express";
 import { AuthJwtGuard as AppAuthJwtGuard } from "src/application/guards"
 import { CreateFinancialTransactionDTO } from "../dtos"
 import { PaymentService } from "../services"
 import { OrangeMoneyUpdateFinancialTransactionStatus } from "../dtos/orange-money-update-financial-transaction.dto";
+import { MtnMoneyUpdateFinancialTransactionStatus } from "../dtos/mtn-money-update-financial-transaction.dto";
 import { Public } from "nest-keycloak-connect";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
+import { FinancialTransactionState } from "../enum";
+import { FinancialTransactionService } from "../services/financial-transaction.service";
+import { FinancialPaymentService } from "src/financial-payment/services";
+import { PaymentStrategyType } from "src/financial-payment/enum";
 
-@Public()
-@UseInterceptors(TransformResponeInterceptor)
 @Controller("payment")
-@ApiTags('Payment-Transaction')
-export class PaymentController
-{
-    constructor(private paymentService:PaymentService){}
+@ApiTags("Payment")
+@UseInterceptors(TransformResponeInterceptor)
+export class PaymentController {
+    constructor(
+        private paymentService: PaymentService,
+        private financialTransactionService: FinancialTransactionService,
+        private financialPaymentService: FinancialPaymentService
+    ) {}
 
     @ApiOperation({
         summary: "Initiate a new transaction payment",
@@ -90,6 +97,17 @@ export class PaymentController
         return await this.paymentService.updatePayementStatus(orangeMoneyUpdateFinancialTransactionStatus.payToken,orangeMoneyUpdateFinancialTransactionStatus.status)      
     }
 
+    @Post("mtn-money-notify-payment")    
+    @Public()
+    @ApiOperation({
+        summary: "MTN Money payment notification",
+        description: "Endpoint for MTN Money to notify about payment status changes"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Notification processed successfully"})
+    async mtnMoneyNotifyPayment(@Req() request:Request, @Body() mtnMoneyUpdateStatus) {
+        return await this.paymentService.updateMtnPaymentStatus(mtnMoneyUpdateStatus.referenceId, mtnMoneyUpdateStatus.status);
+    }
+
 
     @ApiOperation({
         summary: "Get payment-transaction status",
@@ -156,5 +174,47 @@ export class PaymentController
     async checkPayment(@Req() request:Request, @Param("ref") ref:string)
     {
         return await this.paymentService.checkPayment(ref)  
+    }
+
+    @Get("check-mtn-payment/:referenceId")
+    @Public()
+    @ApiOperation({
+        summary: "Check MTN Money payment status",
+        description: "Check the status of an MTN Money payment by reference ID"
+    })
+    @ApiParam({ name: 'referenceId', description: 'Reference ID of the transaction' })
+    @ApiResponse({status: HttpStatus.OK, description: "Payment status retrieved successfully"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Transaction not found"})
+    async checkMtnPaymentStatus(@Param('referenceId') referenceId: string) {
+        const transaction = await this.financialTransactionService.findOneByField({ ref: referenceId });
+        
+        if (!transaction) {
+            throw new NotFoundException(`Transaction with reference ${referenceId} not found`);
+        }
+        
+        // Si la transaction est en attente, vérifier le statut auprès de MTN
+        if (transaction.state === FinancialTransactionState.FINANCIAL_TRANSACTION_PENDING) {
+            const paymentBuilder = this.financialPaymentService.getPaymentBuilder();
+            const mtnStrategy = paymentBuilder.getMethodPayment(PaymentStrategyType.MTN_MONEY);
+            
+            try {
+                const checkResult = await mtnStrategy.check(transaction);
+                
+                // Mettre à jour la transaction si nécessaire
+                if (checkResult.status === 'SUCCESSFUL') {
+                    transaction.state = FinancialTransactionState.FINANCIAL_TRANSACTION_SUCCESS;
+                    transaction.endDate = new Date().toISOString();
+                    await this.financialTransactionService.update(transaction._id, transaction);
+                } else if (checkResult.status === 'FAILED') {
+                    transaction.state = FinancialTransactionState.FINANCIAL_TRANSACTION_ERROR;
+                    transaction.endDate = new Date().toISOString();
+                    await this.financialTransactionService.update(transaction._id, transaction);
+                }
+            } catch (error) {
+                console.error('Error checking MTN payment status:', error);
+            }
+        }
+        
+        return transaction;
     }
 }

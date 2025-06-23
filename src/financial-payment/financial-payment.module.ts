@@ -16,6 +16,9 @@ import { OrangeMoneyStrategyPayment } from "./strategies/orange-money";
         OrangeMoneyStrategyPayment,
         PaymentBuilder,
     ],
-    exports:[ FinancialPaymentService ]
+    exports:[
+        FinancialPaymentService,
+        MtnMoneyStrategyPayment
+    ]
 })
 export class FinancialPaymentModule{}
