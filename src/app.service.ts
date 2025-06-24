@@ -10,7 +10,7 @@ export class AppService {
   }
 
   getVersion(): string {
-    const version = '1.0.0';
+    const version = '1.2.0';
     const env = this.configService.get<string>('NODE_ENV') || 'dev';
     return `Y-Nkap API Version ${env} ${version}`;
   }

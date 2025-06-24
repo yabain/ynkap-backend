@@ -9,7 +9,7 @@ export class AppController {
 
   @Get()
   @Public() 
-  @ApiResponse({status: HttpStatus.OK, description: "The route displaying the application version"})
+  @ApiResponse({status: HttpStatus.OK, description: "L’itinéraire affichant la version de l’application"})
   getMainRoad(): string {
     return this.appService.getVersion();
   }

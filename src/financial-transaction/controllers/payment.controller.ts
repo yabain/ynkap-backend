@@ -13,6 +13,7 @@ import { FinancialTransactionState } from "../enum";
 import { FinancialTransactionService } from "../services/financial-transaction.service";
 import { FinancialPaymentService } from "src/financial-payment/services";
 import { PaymentStrategyType } from "src/financial-payment/enum";
+import { LogTransaction } from '../../logs/interceptors/transaction-logger.interceptor';
 
 @Controller("payment")
 @ApiTags("Payment")
@@ -85,6 +86,7 @@ export class PaymentController {
     })
     // @UseGuards(AppAuthJwtGuard)
     @Post("pay")    
+    @LogTransaction()
     async makePayment(@Req() request:Request, @Body() createFinancialTransactionDTO:CreateFinancialTransactionDTO)
     {
         return await this.paymentService.makePayment(createFinancialTransactionDTO)     
@@ -211,7 +213,7 @@ export class PaymentController {
                     await this.financialTransactionService.update(transaction._id, transaction);
                 }
             } catch (error) {
-                console.error('Error checking MTN payment status:', error);
+                console.error('Erreur de vérification du statut de paiement MTN:', error);
             }
         }
         

@@ -160,7 +160,7 @@ export class PaymentService
         catch(err)
         {
             await transaction.abortTransaction();
-            console.log("Error Payement Update Status",err)
+            console.log("Statut de mise à jour du paiement d’erreur",err)
 
             throw err
 

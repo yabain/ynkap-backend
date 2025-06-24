@@ -1,6 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { KeycloakConnectModule, AuthGuard, RoleGuard } from 'nest-keycloak-connect';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,6 +15,7 @@ import { FinancialPaymentModule } from './financial-payment/financial-payment.mo
 import { LogsModule } from './logs/logs.module';
 import { ActivityLoggerMiddleware } from './logs/middleware/activity-logger.middleware';
 import { ErrorLoggerInterceptor } from './logs/interceptors/error-logger.interceptor';
+import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
 
@@ -62,6 +63,11 @@ import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
     {
       provide: APP_GUARD,
       useClass: RoleGuard,
+    },
+    // Ajouter l'intercepteur de journalisation global
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ActivityLoggerInterceptor,
     },
   ],
 })
