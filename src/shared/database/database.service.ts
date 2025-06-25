@@ -45,27 +45,32 @@
             //     return this.entityModel.find<T>({where:entityObj}).sort({createdAt:1}).populate(this.toPopuloate).exec();
             // }
 
-            async findByField(entityObj: Record<string, any>, session?: ClientSession): Promise<T[]> {
+            async findByField(entityObj: Record<string, any>, session?: ClientSession, options?: { allowDiskUse?: boolean }): Promise<T[]> {
                 console.log('DatabaseService.findByField appelé avec:', entityObj);
                 try {
-                    // Modifier cette ligne pour ne pas filtrer automatiquement sur isDeleted
-                    // const query = this.entityModel.find<T>({...entityObj, isDeleted: false});
-                    
-                    // Nouvelle version qui ne filtre sur isDeleted que si le champ existe dans le schéma
+                    // Créer la requête de base
                     const query = this.entityModel.find<T>(entityObj);
                     
-                    // Utiliser this.toPopuloate au lieu de this.populateOnFind
+                    // Ajouter l'option allowDiskUse si elle est fournie
+                    if (options?.allowDiskUse) {
+                        query.allowDiskUse(true);
+                    }
+                    
+                    // Utiliser this.toPopuloate pour les relations
                     if (this.toPopuloate && this.toPopuloate.length > 0) {
                         this.toPopuloate.forEach(field => {
                             query.populate(field);
                         });
                     }
                     
-                    const results = await query.exec();
-                    console.log(`DatabaseService.findByField: ${results.length} résultats trouvés`);
-                    return results;
+                    // Exécuter la requête avec la session si fournie
+                    if (session) {
+                        return await query.session(session).exec();
+                    }
+                    
+                    return await query.exec();
                 } catch (error) {
-                    console.error('Erreur dans DatabaseService.findByField:', error);
+                    console.error('Erreur dans findByField:', error);
                     throw error;
                 }
             }

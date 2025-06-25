@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Query, Req, Res, UseInterceptors, NotFoundException, InternalServerErrorException } from "@nestjs/common";
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Req, Res, UseInterceptors, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request, Response } from 'express';
 import { Public } from "nest-keycloak-connect";
@@ -328,33 +328,76 @@ export class PaymentHistoryController
     }
 
     @ApiOperation({
-        summary: "Récupérer toutes les transactions",
-        description: "Récupère toutes les transactions avec possibilité de filtrage"
+        summary: 'Récupérer toutes les transactions',
+        description: 'Récupère les transactions financières avec filtrage'
     })
-    @ApiQuery({ name: 'startDate', required: false, description: 'Date de début (ISO format)', example: "2024-01-01T00:00:00.000Z" })
-    @ApiQuery({ name: 'endDate', required: false, description: 'Date de fin (ISO format)', example: "2024-12-31T23:59:59.999Z" })
+    @ApiQuery({ name: 'appID', required: false, description: 'ID de l\'application (ObjectID MongoDB). Si non fourni, retourne toutes les transactions.', example: "6749689642bafee2045b382c" })
+    @ApiQuery({ name: 'startDate', required: false, description: 'Date de début au format ISO', example: "2024-01-01T00:00:00.000Z" })
+    @ApiQuery({ name: 'endDate', required: false, description: 'Date de fin au format ISO', example: "2024-12-31T23:59:59.999Z" })
     @ApiQuery({ name: 'status', required: false, description: 'Statut de la transaction', example: "financial_transaction_success" })
-    @ApiQuery({ name: 'paymentMode', required: false, description: 'Mode de paiement', example: "MTN" })
-    @ApiResponse({status: HttpStatus.OK, description: "Liste des transactions"})
+    @ApiQuery({ name: 'paymentMode', required: false, description: 'Mode de paiement (MTN, ORANGE)', example: "MTN" })
+    @ApiResponse({status: HttpStatus.OK, description: "Liste des transactions récupérées avec succès"})
+    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "Paramètre appID invalide"})
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "Une erreur inattendue s'est produite"})
     @CustomMessage("Transactions récupérées avec succès")
     @Public()
     @Get("all")
     async getAllTransactions(
-        @Query('startDate') startDate?: string,
-        @Query('endDate') endDate?: string,
-        @Query('status') status?: string,
-        @Query('paymentMode') paymentMode?: string
+        @Query() query: any
     ) {
         try {
+            // Extraire les paramètres de la requête
+            const { appID, startDate, endDate, status, paymentMode } = query;
+            
             // Construire le filtre
             const filter: any = {};
+            
+            // Ajouter l'appID au filtre seulement s'il est fourni et valide
+            if (appID && appID.trim() !== '') {
+                try {
+                    // Vérifier si l'appID est un ObjectID MongoDB valide
+                    if (/^[0-9a-fA-F]{24}$/.test(appID)) {
+                        filter.application = new mongoose.Types.ObjectId(appID);
+                    } else {
+                        throw new BadRequestException({
+                            statusCode: 400,
+                            error: "Bad Request",
+                            message: ["appID must be a valid MongoDB ObjectID"],
+                            timestamp: new Date().toISOString(),
+                            path: `/payment-history/all`
+                        });
+                    }
+                } catch (error) {
+                    if (error instanceof BadRequestException) {
+                        throw error;
+                    }
+                    throw new BadRequestException({
+                        statusCode: 400,
+                        error: "Bad Request",
+                        message: ["appID must be a valid MongoDB ObjectID"],
+                        timestamp: new Date().toISOString(),
+                        path: `/payment-history/all`
+                    });
+                }
+            }
             
             // Ajouter les filtres de date si fournis
             if (startDate || endDate) {
                 filter.createdAt = {};
-                if (startDate) filter.createdAt.$gte = new Date(startDate);
-                if (endDate) filter.createdAt.$lte = new Date(endDate);
+                if (startDate) {
+                    try {
+                        filter.createdAt.$gte = new Date(startDate);
+                    } catch (error) {
+                        throw new BadRequestException('Format de date de début invalide');
+                    }
+                }
+                if (endDate) {
+                    try {
+                        filter.createdAt.$lte = new Date(endDate);
+                    } catch (error) {
+                        throw new BadRequestException('Format de date de fin invalide');
+                    }
+                }
             }
             
             // Ajouter le filtre de statut si fourni
@@ -363,15 +406,23 @@ export class PaymentHistoryController
             // Ajouter le filtre de mode de paiement si fourni
             if (paymentMode) filter.paymentMode = paymentMode;
             
-            // Récupérer les transactions
-            const transactions = await this.financialTransactionService.findByField(filter);
+            // Récupérer les transactions avec l'option allowDiskUse
+            const transactions = await this.financialTransactionService.findByField(filter, null, { allowDiskUse: true });
             
             return transactions;
         } catch (error) {
+            if (error instanceof BadRequestException) {
+                throw error;
+            }
+            
+            console.error('Erreur lors de la récupération des transactions:', error);
             throw new InternalServerErrorException({
-                status: HttpStatus.INTERNAL_SERVER_ERROR,
+                statusCode: 500,
+                error: "Internal Server Error",
+                message: ["Erreur lors de la récupération des transactions"],
                 errors: ["transaction/fetch-error"],
-                message: "Erreur lors de la récupération des transactions"
+                timestamp: new Date().toISOString(),
+                path: `/payment-history/all`
             });
         }
     }

@@ -71,3 +71,22 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](LICENSE).
+
+## API d'historique des paiements
+
+L'API d'historique des paiements permet de récupérer et de filtrer les transactions financières.
+
+### Endpoints disponibles
+
+- `GET /payment-history/all` - Récupérer toutes les transactions avec filtrage
+  - Paramètre obligatoire : `appID` (ID de l'application)
+  - Paramètres optionnels : `startDate`, `endDate`, `status`, `paymentMode`
+
+Pour plus de détails, consultez la [documentation de l'API d'historique des paiements](docs/api/payment-history.md).
+
+### Exemple d'utilisation
+
+```bash
+# Récupérer toutes les transactions pour une application spécifique
+curl -X GET "http://localhost:3000/payment-history/all?appID=6749689642bafee2045b382c"
+```

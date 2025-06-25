@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable, NotFoundException } from "@nestjs/common"
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
-import mongoose, { Model } from "mongoose";
+import mongoose, { Model, ClientSession } from "mongoose";
 import { ApplicationService } from "src/application/services";
 import { WalletService } from "src/wallet/services";
 import { CreateFinancialTransactionDTO } from "../dtos";
@@ -367,5 +367,22 @@ export class FinancialTransactionService extends DataBaseService<FinancialTransa
             console.error('Erreur lors de la récupération des transactions:', error);
             throw error;
         }
+    }
+
+    async findByField(entityObj: Record<string, any>, session?: ClientSession, options?: { allowDiskUse?: boolean }): Promise<FinancialTransactionDocument[]> {
+        // Créer la requête de base
+        const query = this.financialTransactionModel.find(entityObj);
+        
+        // Ajouter l'option allowDiskUse si elle est fournie
+        if (options?.allowDiskUse) {
+            query.allowDiskUse(true);
+        }
+        
+        // Exécuter la requête avec la session si fournie
+        if (session) {
+            return await query.session(session).exec();
+        }
+        
+        return await query.exec();
     }
 }

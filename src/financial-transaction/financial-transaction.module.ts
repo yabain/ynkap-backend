@@ -1,37 +1,36 @@
-import { Module } from "@nestjs/common";
-import { MongooseModule } from "@nestjs/mongoose";
-import { FinancialTransaction, FinancialTransactionSchema } from "./models/financial-transaction.schema";
-import { FinancialTransactionService } from "./services/financial-transaction.service";
-import { PaymentService } from "./services/payment.service";
-import { PaymentController } from "./controllers/payment.controller";
-import { PaymentHistoryController } from "./controllers/payment-history.controller";
-import { DecreaseAmountValidator } from "./validators/decrease-amount.validator";
-import { ApplicationModule } from "src/application/application.module";
-import { FinancialPaymentModule } from "src/financial-payment/financial-payment.module";
-import { WalletModule } from "src/wallet/wallet.module";
-import { MtnTestController } from "./controllers/mtn-test.controller";
-import { Reflector, APP_INTERCEPTOR } from "@nestjs/core";
-import { LogsModule } from "src/logs/logs.module";
-import { TransactionLoggerInterceptor } from "src/logs/interceptors/transaction-logger.interceptor";
+import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { FinancialTransaction, FinancialTransactionSchema } from './models/financial-transaction.schema';
+import { FinancialTransactionService } from './services/financial-transaction.service';
+import { PaymentController } from './controllers/payment.controller';
+import { PaymentService } from './services/payment.service';
+import { PaymentHistoryController } from './controllers/payment-history.controller';
+import { ApplicationModule } from '../application/application.module';
+import { WalletModule } from '../wallet/wallet.module';
+import { FinancialPaymentModule } from '../financial-payment/financial-payment.module';
+import { LogsModule } from '../logs/logs.module';
 
 @Module({
-    imports:[
-        MongooseModule.forFeature([{name:FinancialTransaction.name,schema:FinancialTransactionSchema}]),
-        ApplicationModule,
-        FinancialPaymentModule,
-        WalletModule,
-        LogsModule
-    ],
-    controllers:[PaymentController, PaymentHistoryController, MtnTestController],
-    providers:[
-        FinancialTransactionService,
-        PaymentService,
-        DecreaseAmountValidator,
-        Reflector,
-        {
-            provide: APP_INTERCEPTOR,
-            useClass: TransactionLoggerInterceptor,
-        }
-    ]
+  imports: [
+    MongooseModule.forFeature([
+      { name: FinancialTransaction.name, schema: FinancialTransactionSchema }
+    ]),
+    ApplicationModule, // Importer le module contenant ApplicationService
+    WalletModule,      // Importer le module contenant WalletService
+    FinancialPaymentModule, // Importer le module contenant FinancialPaymentService
+    LogsModule         // Importer le module contenant TransactionLogService
+  ],
+  controllers: [
+    PaymentController,
+    PaymentHistoryController
+  ],
+  providers: [
+    FinancialTransactionService,
+    PaymentService
+  ],
+  exports: [
+    FinancialTransactionService,
+    PaymentService
+  ]
 })
 export class FinancialTransactionModule{}

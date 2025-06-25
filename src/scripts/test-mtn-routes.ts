@@ -5,6 +5,16 @@
 
 import axios from 'axios';
 import * as readline from 'readline';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as fs from 'fs';
+
+// Charger les variables d'environnement
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Essayer également .env.dev si .env n'existe pas
+if (!process.env.KEYCLOAK_SERVER_URI && fs.existsSync(path.resolve(__dirname, '../../.env.dev'))) {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env.dev') });
+}
 
 // Fonction utilitaire pour les questions
 function createInterface() {
@@ -19,37 +29,72 @@ function question(rl: readline.Interface, query: string): Promise<string> {
   return new Promise(resolve => rl.question(query, resolve));
 }
 
-// Fonction pour créer un client axios avec le token d'authentification
-async function createAuthenticatedClient(rl: readline.Interface): Promise<any> {
-  console.log('\n=== AUTHENTIFICATION ===');
-  console.log('Veuillez copier-coller un token JWT valide depuis votre console d\'application');
-  console.log('(Vous pouvez le trouver dans les logs de votre application ou dans les en-têtes de requête)');
+// Fonction pour obtenir un token automatiquement
+async function getTokenAutomatically(): Promise<string> {
+  try {
+    console.log('Tentative d\'authentification automatique...');
+    
+    // Vérifier si les variables d'environnement nécessaires sont définies
+    if (!process.env.KEYCLOAK_SERVER_URI || !process.env.KEYCLOAK_SERVER_REALM || 
+        !process.env.KEYCLOAK_SERVER_CLIENTID || !process.env.KEYCLOAK_SERVER_SECRET) {
+      console.log('Variables d\'environnement Keycloak manquantes. Tentative avec les valeurs par défaut...');
+    }
+    
+    // Utiliser les valeurs par défaut si les variables d'environnement ne sont pas définies
+    const keycloakUri = process.env.KEYCLOAK_SERVER_URI || 'http://localhost:8080/auth';
+    const realm = process.env.KEYCLOAK_SERVER_REALM || 'master';
+    const clientId = process.env.KEYCLOAK_SERVER_CLIENTID || 'admin-cli';
+    const clientSecret = process.env.KEYCLOAK_SERVER_SECRET || '';
+    
+    // Utiliser l'authentification client_credentials pour obtenir un token
+    const keycloakUrl = `${keycloakUri}/realms/${realm}/protocol/openid-connect/token`;
+    
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials');
+    params.append('client_id', clientId);
+    
+    if (clientSecret) {
+      params.append('client_secret', clientSecret);
+    }
+    
+    const response = await axios.post(keycloakUrl, params);
+    
+    console.log('Token obtenu avec succès!');
+    return response.data.access_token;
+  } catch (error) {
+    console.error('Erreur lors de l\'authentification automatique:', error.response?.data || error.message);
+    console.log('Impossible d\'obtenir un token automatiquement. Tentative sans authentification...');
+    return '';
+  }
+}
+
+// Fonction pour créer un client axios avec ou sans authentification
+async function createAuthenticatedClient(): Promise<any> {
+  // Essayer d'obtenir un token automatiquement
+  const token = await getTokenAutomatically();
   
-  const token = await question(rl, 'Token JWT: ');
-  
-  if (!token || token.trim() === '') {
-    console.log('Aucun token fourni. Tentative sans authentification...');
+  if (token) {
+    console.log('Client configuré avec authentification.');
+    return axios.create({
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+  } else {
+    console.log('Client configuré sans authentification.');
     return axios.create();
   }
-  
-  console.log('Token reçu. Configuration du client avec authentification...');
-  return axios.create({
-    headers: {
-      'Authorization': `Bearer ${token.trim()}`
-    }
-  });
 }
 
 async function bootstrap() {
   try {
     console.log('Utilisation de l\'application déjà en cours d\'exécution sur le port 3000');
     
-    const rl = createInterface();
-    
-    // Créer un client axios authentifié
-    const client = await createAuthenticatedClient(rl);
+    // Créer un client axios avec ou sans authentification
+    const client = await createAuthenticatedClient();
     
     const baseUrl = 'http://localhost:3000/mtn-test';
+    const rl = createInterface();
 
     console.log('\n=== TEST DES ROUTES MTN MONEY ===');
     
@@ -202,5 +247,6 @@ async function cancelTransaction(baseUrl: string, rl: readline.Interface, client
 }
 
 bootstrap();
+
 
 
