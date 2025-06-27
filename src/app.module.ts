@@ -18,6 +18,7 @@ import { ErrorLoggerInterceptor } from './logs/interceptors/error-logger.interce
 import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -50,7 +51,8 @@ import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
     FinancialTransactionModule,
     FinancialPaymentModule,
     LogsModule,
-    AuthModule
+    AuthModule,
+    UserModule
   ],
   controllers: [AppController],
   providers: [

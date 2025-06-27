@@ -26,7 +26,8 @@ import { LogsModule } from 'src/logs/logs.module';
   ],
   exports: [
     UserService,
-    CreateUserMiddleware
+    CreateUserMiddleware,
+    // Vous pourriez également exporter les contrôleurs si nécessaire
   ]
 })
 export class UserModule {}

@@ -28,7 +28,8 @@
     "test:logs": "ts-node -r tsconfig-paths/register src/scripts/test-logs.ts",
     "test:transaction-logs": "ts-node -r tsconfig-paths/register src/scripts/test-transaction-logs.ts",
     "test:mtn-routes": "ts-node -r tsconfig-paths/register src/scripts/test-mtn-routes.ts",
-    "extract:app-keys": "ts-node -r tsconfig-paths/register src/scripts/extract-app-keys.ts"
+    "extract:app-keys": "ts-node -r tsconfig-paths/register src/scripts/extract-app-keys.ts",
+    "convert:logs-to-capped": "ts-node -r tsconfig-paths/register src/scripts/convert-logs-to-capped.ts"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^25.0.4",

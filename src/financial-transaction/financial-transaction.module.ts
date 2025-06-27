@@ -15,10 +15,10 @@ import { LogsModule } from '../logs/logs.module';
     MongooseModule.forFeature([
       { name: FinancialTransaction.name, schema: FinancialTransactionSchema }
     ]),
-    ApplicationModule, // Importer le module contenant ApplicationService
-    WalletModule,      // Importer le module contenant WalletService
-    FinancialPaymentModule, // Importer le module contenant FinancialPaymentService
-    LogsModule         // Importer le module contenant TransactionLogService
+    ApplicationModule,
+    WalletModule,
+    FinancialPaymentModule,
+    LogsModule  // Assurez-vous que LogsModule est importé ici
   ],
   controllers: [
     PaymentController,
@@ -33,4 +33,4 @@ import { LogsModule } from '../logs/logs.module';
     PaymentService
   ]
 })
-export class FinancialTransactionModule{}
+export class FinancialTransactionModule {}
