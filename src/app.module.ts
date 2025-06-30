@@ -19,11 +19,36 @@ import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.i
 import { AuthModule } from './auth/auth.module';
 import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
 import { UserModule } from './user/user.module';
+import { MongooseModule } from '@nestjs/mongoose';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: `.env.${process.env.NODE_ENV || 'dev'}`
+    }),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        // Essayer différentes variables d'environnement pour l'URI MongoDB
+        let uri = configService.get<string>('MONGODB_URI');
+        if (!uri) {
+          uri = configService.get<string>('MONGO_DATABASE_URL');
+        }
+        if (!uri) {
+          throw new Error('MongoDB URI not defined. Check your environment variables.');
+        }
+        
+        console.log(`Connecting to MongoDB: ${uri.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`);
+        
+        return {
+          uri,
+          // Suppression des options dépréciées
+          // useNewUrlParser: true,
+          // useUnifiedTopology: true,
+        };
+      },
     }),
     KeycloakConnectModule.registerAsync({
       inject: [ConfigService],

@@ -18,6 +18,9 @@ import { KeycloakModule } from "src/keycloak/keycloak.module";
             inject:[ConfigService],
             useFactory: async (configService: ConfigService) => ({
               uri: configService.get<string>('mongoURI')
+              // Suppression des options dépréciées
+              // useNewUrlParser: true,
+              // useUnifiedTopology: true,
             })
         }),
         KeycloakModule

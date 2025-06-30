@@ -156,7 +156,7 @@ async function bootstrap() {
     
     // Récupérer les transactions
     console.log('\nRécupération des transactions...');
-    const transactions = await financialTransactionService.findByField(filter);
+    const transactions = await financialTransactionService.findManyDocuments(filter);
     
     console.log(`\n${transactions.length} transactions trouvées.`);
     
@@ -301,3 +301,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+

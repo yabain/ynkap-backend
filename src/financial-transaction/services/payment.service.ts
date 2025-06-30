@@ -93,7 +93,7 @@ export class PaymentService
         let transaction = await this.connection.startSession(),financialTransaction:FinancialTransactionDocument=null;
         transaction.startTransaction();
         try {
-            financialTransaction=await this.financialTransactionService.findOneByField({token:financialTransactionRef})
+            financialTransaction=await this.financialTransactionService.findOneDocument({token: financialTransactionRef})
             if(!financialTransaction) throw new NotFoundException(`Transaction token ${financialTransactionRef} not found`);
             if(financialTransaction.state==FinancialTransactionState.FINANCIAL_TRANSACTION_ERROR || financialTransaction.state==FinancialTransactionState.FINANCIAL_TRANSACTION_SUCCESS)
                 return financialTransaction;
@@ -137,7 +137,7 @@ export class PaymentService
         let transaction = await this.connection.startSession(),financialTransaction=null;
         transaction.startTransaction();
         try {
-            financialTransaction=await this.financialTransactionService.findOneByField({token:payToken})
+            financialTransaction=await this.financialTransactionService.findOneDocument({token: payToken})
             // console.log("Direct Update payement",payToken,status,financialTransaction)
             if(!financialTransaction) throw new NotFoundException({
                 status:HttpStatus.NOT_FOUND,
@@ -184,7 +184,7 @@ export class PaymentService
      * @returns Transaction mise à jour
      */
     async updateMtnPaymentStatus(referenceId: string, status: string): Promise<FinancialTransaction> {
-        const transaction = await this.financialTransactionService.findOneByField({ ref: referenceId });
+        const transaction = await this.financialTransactionService.findOneDocument({ ref: referenceId });
         
         if (!transaction) {
             throw new NotFoundException(`Transaction with reference ${referenceId} not found`);

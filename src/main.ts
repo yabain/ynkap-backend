@@ -3,7 +3,6 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { GlobalExceptionFilter } from './shared/filters/global-exception.filter';
-import { LogSizeLimiterInterceptor } from './logs/interceptors/log-size-limiter.interceptor';
 import * as mongoose from 'mongoose';
 
 async function bootstrap() {
@@ -17,8 +16,11 @@ async function bootstrap() {
   }));
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new LogSizeLimiterInterceptor());
-  app.enableCors();
+  app.enableCors({
+    origin: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Y-nkap API Documentation')
@@ -31,6 +33,6 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
   
   await app.listen(3000);
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  console.log(`application fonctionne sous: ${await app.getUrl()}`);
 }
 bootstrap();

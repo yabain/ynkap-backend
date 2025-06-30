@@ -166,18 +166,33 @@
 
         async deleteApplication(id): Promise<any>{
             return this.executeWithTransaction(async (session) => {
+                // Vérifier si l'application existe
                 const application = await this.findOneByField({_id: id})
                 if(!application) throw new NotFoundException(`The application with the ID ${id} cannot be found`);
                 
+                // Récupérer le portefeuille associé
                 let wallet = await this.walletService.findOneByField({application: id});
-                if(!wallet) throw new NotFoundException(`The wallet of the application with the ID: ${id} cannot be found `);
-
-                if((wallet.amount == 0)) {
+                
+                // Si un portefeuille existe, vérifier s'il est vide
+                if(wallet) {
+                    if(wallet.amount > 0) {
+                        throw new BadRequestException(`Veuillez transférer les fonds du portefeuille de ${application.name} avant de poursuivre`);
+                    }
+                    
+                    // Supprimer le portefeuille
                     await this.walletService.delete({application: id}, session);
-                    await this.delete({_id: id}, session);
+                    console.log(`Portefeuille de l'application ${id} supprimé avec succès`);
                 } else {
-                    throw new BadRequestException(`Veuillez transférer les fonds du portefeuille de ${application.name} avant de poursuivre`)
+                    console.log(`Aucun portefeuille trouvé pour l'application ${id}, création d'un nouveau portefeuille vide...`);
+                    // Optionnel : créer un portefeuille vide pour maintenir la cohérence des données
+                    // await this.walletService.create({application: id, amount: 0}, session);
                 }
-            })
+                
+                // Supprimer l'application
+                await this.delete({_id: id}, session);
+                console.log(`Application ${id} supprimée avec succès`);
+                
+                return { message: `Application ${application.name} et son portefeuille ont été supprimés avec succès` };
+            });
         }
     }

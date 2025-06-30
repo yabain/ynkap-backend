@@ -34,6 +34,8 @@ async function bootstrap() {
     
     // Connexion directe à MongoDB
     const client = new MongoClient(mongoUri);
+    // Suppression des options dépréciées dans les paramètres
+    // { useNewUrlParser: true, useUnifiedTopology: true }
     await client.connect();
     
     // Extraire le nom de la base de données de l'URI

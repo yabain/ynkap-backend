@@ -107,13 +107,27 @@ export class ApplicationController {
         description: "This method deletes an application and the wallet attached to it"
     })
     @ApiParam({ name: 'id', description: 'ID de l\'application', example: "66bf8a89203d5fab750c0f63"})
-    @ApiResponse({status: HttpStatus.OK, description: "Application successfuly deleted"})
-    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the id passed in parameter cannot be found "})
+    @ApiResponse({status: HttpStatus.OK, description: "Application successfully deleted"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the ID passed in parameter cannot be found"})
+    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "The wallet associated with this application still has funds"})
+    @ApiResponse({status: HttpStatus.FORBIDDEN, description: "You do not have permission to delete this application"})
     @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
-    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
-    
-    async deleteApplicationById(@Param("id", ObjectIDValidationPipe) id:any){
-        await this.applicationService.deleteApplication(id);
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
+
+    async deleteApplicationById(@Param("id", ObjectIDValidationPipe) id: string, @Req() req: Request) {
+        // Vérifier si l'application appartient à l'utilisateur actuel
+        const app = await this.applicationService.findById(id, null); // Passer null comme session
+        
+        if (!app) {
+            throw new NotFoundException(`The application with the ID ${id} cannot be found`);
+        }
+        
+        // Vérifier que l'utilisateur est le propriétaire de l'application
+        if (app.user !== req['user']['sub']) {
+            throw new ForbiddenException('You do not have permission to delete this application');
+        }
+        
+        return await this.applicationService.deleteApplication(id);
     }
 
     @Post(':id/regenerate-keys')
