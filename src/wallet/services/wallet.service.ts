@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { DataBaseService } from "src/shared/database/database.service";
 import { Wallet, WalletDocument } from "../models/wallet.schema";
 import { Connection, Model, ObjectId } from "mongoose";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
+import mongoose from "mongoose";
 
 @Injectable()
 export class WalletService extends DataBaseService<WalletDocument> {
@@ -23,19 +24,29 @@ export class WalletService extends DataBaseService<WalletDocument> {
     }
 
     async getAmounts(applicationIds: any[]): Promise<Map<string, number>> {
-        console.log('WalletService.getAmounts appelé avec IDs:', applicationIds);
         try {
-            const wallets = await this.findByField({
-                application: { $in: applicationIds }
-            });
-            console.log(`${wallets.length} portefeuilles trouvés`);
+            console.log('Récupération des montants pour les applications:', applicationIds);
             
+            // Vérifier si la liste est vide
+            if (!applicationIds || applicationIds.length === 0) {
+                console.log('Liste d\'IDs d\'applications vide, retour d\'une Map vide');
+                return new Map<string, number>();
+            }
+            
+            // Utiliser directement le modèle Mongoose pour éviter les problèmes avec findAll
+            const wallets = await this.walletModel.find({ 
+                application: { $in: applicationIds } 
+            }).exec();
+            
+            console.log(`${wallets.length} portefeuilles trouvés pour ${applicationIds.length} applications`);
+            
+            // Créer une Map des montants par ID d'application
             const amountsMap = new Map<string, number>();
             
             wallets.forEach(wallet => {
-                const appId = wallet.application.toString();
-                amountsMap.set(appId, wallet.amount || 0);
-                console.log(`Portefeuille pour application ${appId}: montant = ${wallet.amount || 0}`);
+                const appIdStr = wallet.application.toString();
+                amountsMap.set(appIdStr, wallet.amount || 0);
+                console.log(`Application ${appIdStr}: montant = ${wallet.amount || 0}`);
             });
             
             // Vérifier les applications sans portefeuille
@@ -63,5 +74,75 @@ export class WalletService extends DataBaseService<WalletDocument> {
         let wallet = await this.findOneByField({"_id": walletID});
         if(wallet.amount < amount) return null;
         return this.update({"_id": walletID}, {amount: wallet.amount - amount}, session);
+    }
+
+    /**
+     * Met à jour le montant d'un portefeuille pour une application spécifique
+     * @param appID ID de l'application
+     * @param amount Nouveau montant du portefeuille
+     * @returns Le portefeuille mis à jour
+     */
+    async updateWalletAmount(appID: string, amount: number): Promise<WalletDocument> {
+        console.log(`Mise à jour du portefeuille pour l'application ${appID} avec le montant ${amount}`);
+        
+        if (amount < 0) {
+            throw new BadRequestException("Le montant du portefeuille ne peut pas être négatif");
+        }
+        
+        // Convertir l'ID en ObjectId si nécessaire
+        const applicationId = typeof appID === 'string' 
+            ? new mongoose.Types.ObjectId(appID) 
+            : appID;
+        
+        // Rechercher le portefeuille existant
+        const wallet = await this.walletModel.findOne({ application: applicationId });
+        
+        if (!wallet) {
+            throw new NotFoundException(`Aucun portefeuille trouvé pour l'application ${appID}`);
+        }
+        
+        // Mettre à jour le montant
+        wallet.amount = amount;
+        const updatedWallet = await wallet.save();
+        
+        console.log(`Portefeuille mis à jour avec succès:`, updatedWallet);
+        return updatedWallet;
+    }
+
+    /**
+     * Crée ou met à jour un portefeuille pour une application spécifique
+     * @param appID ID de l'application
+     * @param amount Montant initial du portefeuille (défaut: 0)
+     * @returns Le portefeuille créé ou mis à jour
+     */
+    async createOrUpdateWallet(appID: string, amount: number = 0): Promise<WalletDocument> {
+        console.log(`Création/mise à jour du portefeuille pour l'application ${appID} avec le montant ${amount}`);
+        
+        if (amount < 0) {
+            throw new BadRequestException("Le montant du portefeuille ne peut pas être négatif");
+        }
+        
+        // Convertir l'ID en ObjectId si nécessaire
+        const applicationId = typeof appID === 'string' 
+            ? new mongoose.Types.ObjectId(appID) 
+            : appID;
+        
+        // Rechercher un portefeuille existant
+        let wallet = await this.walletModel.findOne({ application: applicationId });
+        
+        if (wallet) {
+            console.log(`Portefeuille existant trouvé pour l'application ${appID}, mise à jour...`);
+            wallet.amount = amount;
+            return await wallet.save();
+        } else {
+            console.log(`Aucun portefeuille trouvé pour l'application ${appID}, création d'un nouveau...`);
+            // Créer un nouveau portefeuille
+            const newWallet = new this.walletModel({
+                application: applicationId,
+                amount: amount
+            });
+            
+            return await newWallet.save();
+        }
     }
 }

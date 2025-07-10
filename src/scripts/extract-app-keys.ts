@@ -42,7 +42,7 @@ async function bootstrap() {
           },
           test: {
             clientId: application.clientIdTest,
-            privateKey: application.privateKeytest, // Note: utiliser la propriété exacte comme dans votre schéma
+            privateKey: application.privateKeyTest, // Correction de privateKeytest -> privateKeyTest
             active: application.envTest
           }
         };
@@ -84,3 +84,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+

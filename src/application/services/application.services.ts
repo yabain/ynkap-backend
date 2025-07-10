@@ -94,7 +94,7 @@
                     updateData.privateKeyProd = this.generateSecureKey();
                 } else {
                     updateData.clientIdTest = uuidv4();
-                    updateData.privateKeytest = this.generateSecureKey();
+                    updateData.privateKeyTest = this.generateSecureKey(); 
                 }
                 
                 const updatedApp = await this.update({ _id: appId }, updateData, session);
@@ -102,7 +102,7 @@
             });
         }
 
-        async getAllApplications(req): Promise<any[]>{
+        async getAllApplications(req): Promise<any[]> {
             console.log('Service: Récupération des applications pour l\'utilisateur:', req['user']?.sub);
             
             if (!req['user'] || !req['user']['sub']) {
@@ -111,22 +111,24 @@
             }
             
             try {
-                let applications = await this.findByField({user: req['user']['sub']});
-                console.log(`${applications.length} applications trouvées en base de données`);
+                // Utiliser directement le modèle Mongoose pour éviter les problèmes avec findAll
+                const applications = await this.applicationModel.find({ 
+                    user: req['user']['sub'], 
+                    isDeleted: false 
+                }).exec();
                 
-                if (applications.length === 0) {
-                    console.log('Aucune application trouvée pour cet utilisateur');
+                if (!applications || applications.length === 0) {
                     return [];
                 }
                 
                 console.log('IDs des applications trouvées:', applications.map(app => app._id));
                 
-                let walletAmounts = await this.walletService.getAmounts((applications.map((app) => app._id)));
+                const walletAmounts: Map<string, number> = await this.walletService.getAmounts(applications.map((app) => app._id));
                 console.log('Montants des portefeuilles récupérés:', walletAmounts);
 
                 return applications.map((application) => {
                     const appObj = application.toObject();
-                    const walletAmount = walletAmounts.get(application._id.toString());
+                    const walletAmount = walletAmounts.get(application._id.toString()) || 0;
                     console.log(`Application ${application._id}: montant du portefeuille =`, walletAmount);
                     
                     return {

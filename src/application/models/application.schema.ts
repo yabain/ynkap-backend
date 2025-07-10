@@ -38,7 +38,7 @@ export class Application extends Document {
     privateKeyProd: string;
 
     @Prop({default: PrivateKey.TEST})
-    privateKeytest: string;
+    privateKeyTest: string; 
 
     @Prop({type: [{type: mongoose.Schema.Types.ObjectId, ref: PaymentMethod.name}], default:[]})
     paymentMethods: PaymentMethod[];

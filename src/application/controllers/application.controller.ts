@@ -185,7 +185,7 @@ export class ApplicationController {
             },
             test: {
                 clientId: app.clientIdTest,
-                privateKey: app.privateKeytest,
+                privateKey: app.privateKeyTest, 
                 active: app.envTest
             }
         };

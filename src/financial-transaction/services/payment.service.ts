@@ -2,7 +2,7 @@ import { HttpException, HttpStatus, Injectable, NotFoundException } from "@nestj
 import { FinancialPaymentService } from "src/financial-payment/services";
 import { CreateFinancialTransactionDTO } from "../dtos";
 import { FinancialTransactionService } from "./financial-transaction.service";
-import mongoose from "mongoose"
+import mongoose from "mongoose";
 import { InjectConnection } from "@nestjs/mongoose";
 import { FinancialTransactionState } from "../enum";
 import { WalletService } from "src/wallet/services";
@@ -26,26 +26,31 @@ export class PaymentService
         private readonly transactionLogService: TransactionLogService
     ){}
 
-    async makePayment(createFinancialTransactionDTO:CreateFinancialTransactionDTO)
-    {
-        const transaction= await this.connection.startSession();
+    async makePayment(createFinancialTransactionDTO: CreateFinancialTransactionDTO) {
+        const transaction = await this.connection.startSession();
         transaction.startTransaction();
-        let financialTransaction:FinancialTransactionDocument=null;
+        let financialTransaction: FinancialTransactionDocument = null;
         try {    
-            financialTransaction=await this.financialTransactionService.createNewFinancialTransaction(createFinancialTransactionDTO,transaction);
+            financialTransaction = await this.financialTransactionService.createNewFinancialTransaction(createFinancialTransactionDTO, transaction);
+            
+            // Conversion explicite en string pour les IDs
+            const transactionId = financialTransaction._id.toString();
+            const applicationId = financialTransaction.application.toString();
+            const userId = createFinancialTransactionDTO.userId || 
+                          (financialTransaction.userRef?.fullName ? financialTransaction.userRef.fullName : 'Unknown');
             
             // Log de création de transaction
             await this.transactionLogService.logTransaction(
-                financialTransaction._id.toString(),
-                financialTransaction.application.toString(),
+                transactionId,
+                applicationId,
                 financialTransaction.state,
                 financialTransaction.type,
                 financialTransaction.amount,
                 financialTransaction.paymentMode,
-                createFinancialTransactionDTO.userId || financialTransaction.userRef?.fullName
+                userId
             );
             
-            financialTransaction= await this.financialTransactionService.update(
+            financialTransaction = await this.financialTransactionService.update(
                 {_id:financialTransaction._id},
                 await this.paymentService.makePaiement(financialTransaction),
                 transaction
@@ -53,27 +58,32 @@ export class PaymentService
             
             // Log de mise à jour de l'état de la transaction
             await this.transactionLogService.logTransactionStateChange(
-                financialTransaction._id.toString(),
-                financialTransaction.application.toString(),
+                transactionId,
+                applicationId,
                 FinancialTransactionState.FINANCIAL_TRANSACTION_START,
                 financialTransaction.state,
-                createFinancialTransactionDTO.userId || financialTransaction.userRef?.fullName
+                userId
             );
             
             await transaction.commitTransaction();
         } catch(err) {
             await transaction.abortTransaction();
             
-            // Log d'erreur de transaction
+            // Log d'erreur de transaction avec conversion explicite
             if (financialTransaction) {
+                const transactionId = financialTransaction._id.toString();
+                const applicationId = financialTransaction.application.toString();
+                const userId = createFinancialTransactionDTO.userId || 
+                              (financialTransaction.userRef?.fullName ? financialTransaction.userRef.fullName : 'Unknown');
+                
                 await this.transactionLogService.logTransaction(
-                    financialTransaction._id.toString(),
-                    financialTransaction.application.toString(),
+                    transactionId,
+                    applicationId,
                     FinancialTransactionState.FINANCIAL_TRANSACTION_ERROR,
                     financialTransaction.type,
                     financialTransaction.amount,
                     financialTransaction.paymentMode,
-                    createFinancialTransactionDTO.userId || financialTransaction.userRef?.fullName,
+                    userId,
                     { error: err.message }
                 );
             }

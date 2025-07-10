@@ -1,11 +1,13 @@
-import { Controller, Get, HttpStatus, Param, Req, UseInterceptors } from "@nestjs/common";
+import { Controller, Get, HttpStatus, Param, Req, UseInterceptors, Put, Body, Post } from "@nestjs/common";
 import { Public } from "nest-keycloak-connect";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
-import { WalletService } from "../services";
+import { WalletService } from "../services/wallet.services";
 import mongoose from "mongoose";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiParam, ApiResponse, ApiTags, ApiBody } from "@nestjs/swagger";
 import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
+import { UpdateWalletDTO } from '../dtos/update-wallet.dto';
+import { CreateWalletDTO } from '../dtos/create-wallet.dto';
 
 @Controller("wallet")
 @UseInterceptors(TransformResponeInterceptor)
@@ -65,5 +67,71 @@ export class WalletController
     async getWalletFromAppID(@Req() request:Request, @Param("appID", ObjectIDValidationPipe) appID:string)
     {
         return await this.walletService.findOneByField({'application':new mongoose.Types.ObjectId(appID)})
+    }
+
+    @CustomMessage('Wallet successfully updated')
+    @ApiOperation({
+        summary: "Update wallet amount for a specific application",
+        description: "This method updates the wallet amount of a specific application"
+    })
+    @ApiParam({ name: 'appID', description: 'ID of the application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiBody({ 
+        schema: {
+            type: 'object',
+            properties: {
+                amount: { type: 'number', example: 100 }
+            },
+            required: ['amount']
+        }
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Wallet updated successfully",
+        example: {
+            "statusCode": 200,
+            "message": "Wallet successfully updated",
+            "data" : {
+                "_id": "66bf8a89203d5fab750c0f42",
+                "amount": 100,
+                "application": "66bf8a89203d5fab750c0f63",
+                "createdAt": "2024-11-29T07:09:10.949Z"
+            }
+        }
+    })
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The wallet for the specified application cannot be found"})
+    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "Invalid amount value"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
+    @Put(":appID")
+    async updateWalletAmount(
+        @Param("appID", ObjectIDValidationPipe) appID: string,
+        @Body() updateWalletDto: UpdateWalletDTO
+    ) {
+        return await this.walletService.updateWalletAmount(appID, updateWalletDto.amount);
+    }
+
+    @CustomMessage('Wallet successfully created')
+    @ApiOperation({
+        summary: "Create wallet for a specific application",
+        description: "This method creates a wallet for a specific application if it doesn't exist"
+    })
+    @ApiParam({ name: 'appID', description: 'ID of the application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiBody({ 
+        schema: {
+            type: 'object',
+            properties: {
+                amount: { type: 'number', example: 0, default: 0 }
+            }
+        }
+    })
+    @ApiResponse({status: HttpStatus.CREATED, description: "Wallet created successfully"})
+    @ApiResponse({status: HttpStatus.CONFLICT, description: "A wallet already exists for this application"})
+    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "Invalid application ID or amount"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
+    @Post(":appID")
+    async createWallet(
+        @Param("appID", ObjectIDValidationPipe) appID: string,
+        @Body() createWalletDto: CreateWalletDTO = { amount: 0 }
+    ) {
+        return await this.walletService.createOrUpdateWallet(appID, createWalletDto.amount || 0);
     }
 }

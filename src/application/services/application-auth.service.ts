@@ -14,7 +14,7 @@ export class ApplicationAuthService {
         const app = await this.applicationService.findOneByField({ 
             $or: [
                 { clientIdProd: clientId, privateKeyProd: privateKey, envProd: true },
-                { clientIdTest: clientId, privateKeytest: privateKey, envTest: true }
+                { clientIdTest: clientId, privateKeyTest: privateKey, envTest: true }
             ],
             isDeleted: false
         });
