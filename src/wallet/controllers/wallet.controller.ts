@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Param, Req, UseInterceptors, Put, Body, Post } from "@nestjs/common";
+import { Controller, Get, HttpStatus, Param, Req, UseInterceptors, Put, Body, Post, Delete, NotFoundException, BadRequestException } from "@nestjs/common";
 import { Public } from "nest-keycloak-connect";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
@@ -133,5 +133,57 @@ export class WalletController
         @Body() createWalletDto: CreateWalletDTO = { amount: 0 }
     ) {
         return await this.walletService.createOrUpdateWallet(appID, createWalletDto.amount || 0);
+    }
+
+    @Delete(":appID")
+    @CustomMessage('Wallet successfully deleted')
+    @ApiOperation({
+        summary: "Delete wallet for a specific application",
+        description: "This method deletes a wallet for a specific application if it has no funds"
+    })
+    @ApiParam({ name: 'appID', description: 'ID of the application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiResponse({status: HttpStatus.OK, description: "Wallet deleted successfully"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The wallet for the specified application cannot be found"})
+    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "The wallet still has funds"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    async deleteWallet(@Param("appID", ObjectIDValidationPipe) appID: string) {
+        // Vérifier si le portefeuille existe et s'il a des fonds
+        const wallet = await this.walletService.findOneByField({'application': new mongoose.Types.ObjectId(appID)});
+        
+        if (!wallet) {
+            throw new NotFoundException(`No wallet found for application ${appID}`);
+        }
+        
+        if (wallet.amount > 0) {
+            throw new BadRequestException(`Please transfer all funds from the wallet before deleting it`);
+        }
+        
+        return await this.walletService.delete({'application': new mongoose.Types.ObjectId(appID)});
+    }
+
+    @CustomMessage('Funds added to wallet successfully')
+    @ApiOperation({
+        summary: "Add funds to wallet for a specific application",
+        description: "This method adds funds to the wallet of a specific application"
+    })
+    @ApiParam({ name: 'appID', description: 'ID of the application', example: "66bf8a89203d5fab750c0f63"})
+    @ApiBody({ 
+        schema: {
+            type: 'object',
+            properties: {
+                amount: { type: 'number', example: 100 }
+            },
+            required: ['amount']
+        }
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Funds added to wallet successfully"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The wallet for the specified application cannot be found"})
+    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "Invalid amount value"})
+    @Post(":appID/add")
+    async addToWalletAmount(
+        @Param("appID", ObjectIDValidationPipe) appID: string,
+        @Body() updateWalletDto: UpdateWalletDTO
+    ) {
+        return await this.walletService.addToWalletAmount(appID, updateWalletDto.amount);
     }
 }

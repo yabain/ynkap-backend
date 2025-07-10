@@ -169,7 +169,7 @@
         async deleteApplication(id): Promise<any>{
             return this.executeWithTransaction(async (session) => {
                 // Vérifier si l'application existe
-                const application = await this.findOneByField({_id: id})
+                const application = await this.findOneByField({_id: id});
                 if(!application) throw new NotFoundException(`The application with the ID ${id} cannot be found`);
                 
                 // Récupérer le portefeuille associé
@@ -184,13 +184,9 @@
                     // Supprimer le portefeuille
                     await this.walletService.delete({application: id}, session);
                     console.log(`Portefeuille de l'application ${id} supprimé avec succès`);
-                } else {
-                    console.log(`Aucun portefeuille trouvé pour l'application ${id}, création d'un nouveau portefeuille vide...`);
-                    // Optionnel : créer un portefeuille vide pour maintenir la cohérence des données
-                    // await this.walletService.create({application: id, amount: 0}, session);
                 }
                 
-                // Supprimer l'application
+                // Continuer avec la suppression de l'application
                 await this.delete({_id: id}, session);
                 console.log(`Application ${id} supprimée avec succès`);
                 

@@ -4,6 +4,7 @@ import { Wallet, WalletDocument } from "../models/wallet.schema";
 import { Connection, Model, ObjectId } from "mongoose";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
 import mongoose from "mongoose";
+import { ClientSession } from "mongoose";
 
 @Injectable()
 export class WalletService extends DataBaseService<WalletDocument> {
@@ -116,5 +117,56 @@ export class WalletService extends DataBaseService<WalletDocument> {
             
             return await newWallet.save();
         }
+    }
+
+    /**
+     * Supprime un portefeuille s'il n'a pas de fonds
+     * @param filter Filtre pour trouver le portefeuille à supprimer
+     * @param session Session de transaction optionnelle
+     * @returns Résultat de la suppression
+     */
+    async delete(filter: any, session?: ClientSession): Promise<any> {
+        // Vérifier si le portefeuille a des fonds
+        const wallet = await this.findOneByField(filter);
+        
+        if (wallet && wallet.amount > 0) {
+            throw new BadRequestException(`Cannot delete wallet with funds. Please transfer all funds first.`);
+        }
+        
+        // Utiliser la méthode delete héritée de DataBaseService
+        return super.delete(filter, session);
+    }
+
+    /**
+     * Ajoute un montant au portefeuille existant
+     * @param appID ID de l'application
+     * @param amount Montant à ajouter au portefeuille
+     * @returns Le portefeuille mis à jour
+     */
+    async addToWalletAmount(appID: string, amount: number): Promise<WalletDocument> {
+        console.log(`Ajout de ${amount} au portefeuille pour l'application ${appID}`);
+        
+        if (amount < 0) {
+            throw new BadRequestException("Le montant à ajouter ne peut pas être négatif");
+        }
+        
+        // Convertir l'ID en ObjectId si nécessaire
+        const applicationId = typeof appID === 'string' 
+            ? new mongoose.Types.ObjectId(appID) 
+            : appID;
+        
+        // Rechercher le portefeuille existant
+        const wallet = await this.walletModel.findOne({ application: applicationId });
+        
+        if (!wallet) {
+            throw new NotFoundException(`Aucun portefeuille trouvé pour l'application ${appID}`);
+        }
+        
+        // Ajouter le montant au lieu de remplacer
+        wallet.amount = wallet.amount + amount;
+        const updatedWallet = await wallet.save();
+        
+        console.log(`Portefeuille mis à jour avec succès: ${updatedWallet.amount}`);
+        return updatedWallet;
     }
 }

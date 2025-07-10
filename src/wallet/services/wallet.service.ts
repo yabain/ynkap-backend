@@ -145,4 +145,37 @@ export class WalletService extends DataBaseService<WalletDocument> {
             return await newWallet.save();
         }
     }
+
+    /**
+     * Ajoute un montant au portefeuille existant
+     * @param appID ID de l'application
+     * @param amount Montant à ajouter au portefeuille
+     * @returns Le portefeuille mis à jour
+     */
+    async addToWalletAmount(appID: string, amount: number): Promise<WalletDocument> {
+        console.log(`Ajout de ${amount} au portefeuille pour l'application ${appID}`);
+        
+        if (amount < 0) {
+            throw new BadRequestException("Le montant à ajouter ne peut pas être négatif");
+        }
+        
+        // Convertir l'ID en ObjectId si nécessaire
+        const applicationId = typeof appID === 'string' 
+            ? new mongoose.Types.ObjectId(appID) 
+            : appID;
+        
+        // Rechercher le portefeuille existant
+        const wallet = await this.walletModel.findOne({ application: applicationId });
+        
+        if (!wallet) {
+            throw new NotFoundException(`Aucun portefeuille trouvé pour l'application ${appID}`);
+        }
+        
+        // Ajouter le montant au lieu de remplacer
+        wallet.amount = wallet.amount + amount;
+        const updatedWallet = await wallet.save();
+        
+        console.log(`Portefeuille mis à jour avec succès: ${updatedWallet.amount}`);
+        return updatedWallet;
+    }
 }
