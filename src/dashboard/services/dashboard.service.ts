@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { UserService } from '../../user/services/user.services';
 import { ApplicationService } from '../../application/services/application.services';
 import { FinancialTransactionService } from '../../financial-transaction/services/financial-transaction.service';
-import { DashboardStatsDTO } from '../dtos/dashboard-stats.dto';
+import { DashboardStatsDTO, TransactionDTO } from '../dtos/dashboard-stats.dto';
 import { Request } from 'express';
 import { PaymentStrategyType } from '../../financial-payment/enum/finance.enum';
 
@@ -34,9 +34,9 @@ export class DashboardService {
     const applications = await this.getApplications(req);
     const numberOfApplication = applications.length;
     
-    // Obtenir le nombre total de transactions pour toutes les applications de l'utilisateur
+    // Obtenir toutes les transactions pour toutes les applications de l'utilisateur
     const appIds = applications.map(app => app._id.toString());
-    const allTransactionOfAllApplicationForAnUser = await this.getTransactionCount(appIds);
+    const allTransactionOfAllApplicationForAnUser = await this.getAllTransactions(appIds);
     
     return {
       amountOfUser,
@@ -67,19 +67,30 @@ export class DashboardService {
     }
   }
   
-  private async getTransactionCount(appIds: string[]): Promise<number> {
-    // Implémentation pour compter les transactions
+  private async getAllTransactions(appIds: string[]): Promise<TransactionDTO[]> {
+    // Implémentation pour obtenir toutes les transactions
     try {
-      if (!appIds.length) return 0;
+      if (!appIds.length) return [];
       
       const transactions = await this.financialTransactionService.findByField({
         application: { $in: appIds }
       });
       
-      return transactions.length;
+      // Transformer les documents en objets DTO
+      return transactions.map(transaction => ({
+        _id: transaction._id.toString(),
+        ref: transaction.ref,
+        amount: transaction.amount,
+        moneyCode: transaction.moneyCode,
+        state: transaction.state,
+        type: transaction.type,
+        paymentMode: transaction.paymentMode,
+        createdAt: transaction.createdAt,
+        application: transaction.application.toString()
+      }));
     } catch (error) {
-      console.error('Error counting transactions:', error);
-      return 0;
+      console.error('Error getting transactions:', error);
+      return [];
     }
   }
   
@@ -131,4 +142,5 @@ export class DashboardService {
     }
   }
 }
+
 
