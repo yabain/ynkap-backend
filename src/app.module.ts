@@ -20,6 +20,7 @@ import { AuthModule } from './auth/auth.module';
 import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
 import { UserModule } from './user/user.module';
 import { MongooseModule } from '@nestjs/mongoose';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -77,7 +78,8 @@ import { MongooseModule } from '@nestjs/mongoose';
     FinancialPaymentModule,
     LogsModule,
     AuthModule,
-    UserModule
+    UserModule,
+    DashboardModule
   ],
   controllers: [AppController],
   providers: [

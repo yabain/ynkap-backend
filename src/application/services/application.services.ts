@@ -177,13 +177,15 @@
                 
                 // Si un portefeuille existe, vérifier s'il est vide
                 if(wallet) {
+                    const walletId = wallet._id; // Récupération de l'ID du portefeuille
+                    console.log(`ID du portefeuille: ${walletId}`);
+                    
                     if(wallet.amount > 0) {
                         throw new BadRequestException(`Veuillez transférer les fonds du portefeuille de ${application.name} avant de poursuivre`);
                     }
                     
-                    // Supprimer le portefeuille
-                    await this.walletService.delete({application: id}, session);
-                    console.log(`Portefeuille de l'application ${id} supprimé avec succès`);
+                    // Utilisation de l'ID pour supprimer le portefeuille
+                    await this.walletService.delete({"_id": walletId}, session);
                 }
                 
                 // Continuer avec la suppression de l'application
