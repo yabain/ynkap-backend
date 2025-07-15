@@ -1,29 +1,33 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common";
+import { HttpException, HttpStatus, Injectable, NotFoundException, Inject, forwardRef } from "@nestjs/common";
 import { FinancialPaymentService } from "src/financial-payment/services";
 import { CreateFinancialTransactionDTO } from "../dtos";
 import { FinancialTransactionService } from "./financial-transaction.service";
 import mongoose from "mongoose";
 import { InjectConnection } from "@nestjs/mongoose";
 import { FinancialTransactionState } from "../enum";
-import { WalletService } from "src/wallet/services";
+import { WalletService } from "src/wallet/services/wallet.service";
 import { FinancialTransactionType, PaymentStrategyType } from "src/financial-payment/enum";
 import { ConfigService } from "@nestjs/config";
-import { StrategyResponseStatus } from "src/financial-payment/strategies/strategy-response-status.enum";
-import { FinancialTransactionDocument, FinancialTransaction } from "../models";
-import { UtilStrategyFunc } from "src/financial-payment/strategies/util-strategy-func";
-import { ERROR_CODE } from "src/shared/config/errors";
+import { FinancialTransactionDocument } from "../models";
 import { TransactionLogService } from 'src/logs/services/transaction-log.service';
+import { UtilStrategyFunc } from "src/financial-payment/strategies/util-strategy-func";
+
+// Définir ERROR_CODE avec des valeurs numériques
+const ERROR_CODE = {
+    RESSOURCE_NOT_FOUND_ERROR: 404,
+    UNKNOW_ERROR: 500
+};
 
 @Injectable()
 export class PaymentService
 {
     constructor(
-        private paymentService:FinancialPaymentService,
-        private walletService:WalletService,
-        private financialTransactionService:FinancialTransactionService,
-        private configServie:ConfigService,
-        @InjectConnection() private readonly connection:mongoose.Connection,
-        private readonly transactionLogService: TransactionLogService
+        private paymentService: FinancialPaymentService,
+        @Inject(forwardRef(() => WalletService)) private walletService: WalletService,
+        private financialTransactionService: FinancialTransactionService,
+        private configService: ConfigService,
+        @InjectConnection() private readonly connection: mongoose.Connection,
+        @Inject(forwardRef(() => TransactionLogService)) private readonly transactionLogService: TransactionLogService
     ){}
 
     async makePayment(createFinancialTransactionDTO: CreateFinancialTransactionDTO) {
@@ -33,13 +37,11 @@ export class PaymentService
         try {    
             financialTransaction = await this.financialTransactionService.createNewFinancialTransaction(createFinancialTransactionDTO, transaction);
             
-            // Conversion explicite en string pour les IDs
             const transactionId = financialTransaction._id.toString();
             const applicationId = financialTransaction.application.toString();
             const userId = createFinancialTransactionDTO.userId || 
                           (financialTransaction.userRef?.fullName ? financialTransaction.userRef.fullName : 'Unknown');
             
-            // Log de création de transaction
             await this.transactionLogService.logTransaction(
                 transactionId,
                 applicationId,
@@ -56,7 +58,6 @@ export class PaymentService
                 transaction
             );
             
-            // Log de mise à jour de l'état de la transaction
             await this.transactionLogService.logTransactionStateChange(
                 transactionId,
                 applicationId,
@@ -69,7 +70,6 @@ export class PaymentService
         } catch(err) {
             await transaction.abortTransaction();
             
-            // Log d'erreur de transaction avec conversion explicite
             if (financialTransaction) {
                 const transactionId = financialTransaction._id.toString();
                 const applicationId = financialTransaction.application.toString();
@@ -97,9 +97,7 @@ export class PaymentService
     }
 
 
-    async checkPayment(financialTransactionRef)
-    {
-
+    async checkPayment(financialTransactionRef: string) {
         let transaction = await this.connection.startSession(),financialTransaction:FinancialTransactionDocument=null;
         transaction.startTransaction();
         try {
@@ -121,7 +119,7 @@ export class PaymentService
         {
             await transaction.abortTransaction();
 
-            let error = err.response?.statusCode | err;            
+            let error = err.response?.statusCode || err.status || HttpStatus.INTERNAL_SERVER_ERROR;            
             switch(error)
             {
                 case ERROR_CODE.RESSOURCE_NOT_FOUND_ERROR:
@@ -148,7 +146,6 @@ export class PaymentService
         transaction.startTransaction();
         try {
             financialTransaction=await this.financialTransactionService.findOneDocument({token: payToken})
-            // console.log("Direct Update payement",payToken,status,financialTransaction)
             if(!financialTransaction) throw new NotFoundException({
                 status:HttpStatus.NOT_FOUND,
                 message:`Transaction PayToken ${payToken} not found`
@@ -170,10 +167,8 @@ export class PaymentService
         catch(err)
         {
             await transaction.abortTransaction();
-            console.log("Statut de mise à jour du paiement d’erreur",err)
-
+            console.log("Statut de mise à jour du paiement d'erreur",err)
             throw err
-
         }
         finally
         {
@@ -181,10 +176,12 @@ export class PaymentService
         }   
     }
 
-    async updateWallet(financialTransaction,transaction=null)
+    async updateWallet(financialTransaction, transaction=null)
     {
-        if(financialTransaction.type==FinancialTransactionType.DEPOSIT) await this.walletService.increaseWallet(financialTransaction.wallet._id,financialTransaction.amount,transaction)
-        else await this.walletService.decreaseWallet(financialTransaction.wallet._id,financialTransaction.amount,transaction)
+        if(financialTransaction.type==FinancialTransactionType.DEPOSIT) 
+            await this.walletService.increaseWallet(financialTransaction.wallet._id, financialTransaction.amount, transaction);
+        else 
+            await this.walletService.decreaseWallet(financialTransaction.wallet._id, financialTransaction.amount, transaction);
     }
 
     /**
@@ -193,7 +190,7 @@ export class PaymentService
      * @param status Statut de la transaction
      * @returns Transaction mise à jour
      */
-    async updateMtnPaymentStatus(referenceId: string, status: string): Promise<FinancialTransaction> {
+    async updateMtnPaymentStatus(referenceId: string, status: string): Promise<FinancialTransactionDocument> {
         const transaction = await this.financialTransactionService.findOneDocument({ ref: referenceId });
         
         if (!transaction) {
@@ -202,7 +199,6 @@ export class PaymentService
         
         let newState: FinancialTransactionState;
         
-        // Mapper les statuts MTN aux statuts de notre application
         switch (status.toUpperCase()) {
             case 'SUCCESSFUL':
                 newState = FinancialTransactionState.FINANCIAL_TRANSACTION_SUCCESS;
@@ -217,7 +213,6 @@ export class PaymentService
                 newState = FinancialTransactionState.FINANCIAL_TRANSACTION_ERROR;
         }
         
-        // Mettre à jour la transaction
         transaction.state = newState;
         transaction.endDate = new Date().toISOString();
         

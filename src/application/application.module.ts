@@ -1,42 +1,38 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { Application, ApplicationSchema } from './models';
-import { ApplicationService } from './services';
+import { Application, ApplicationSchema } from './models/application.schema';
+import { ApplicationService } from './services/application.services';
 import { ApplicationController } from './controllers/application.controller';
-import { ApplicationAuthService } from './services/application-auth.service';
-import { ApplicationAuthController } from './controllers/application-auth.controller';
-import { BasicStrategy } from './stategies/auth-basic.stategy';
-import { AuthJwtStrategy } from './stategies/auth-jwt.strategy';
-import { JWT_CONSTANT } from 'src/shared/config';
 import { WalletModule } from 'src/wallet/wallet.module';
+import { FinancialTransactionModule } from 'src/financial-transaction/financial-transaction.module';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthJwtGuard } from './guards/auth-jwt.guard';
+import { AuthJwtStrategy } from './stategies/auth-jwt.strategy';
 
 @Module({
-    imports: [
-        MongooseModule.forFeature([
-            { name: Application.name, schema: ApplicationSchema }
-        ]),
-        PassportModule,
-        JwtModule.register({
-            secret: JWT_CONSTANT.secret,
-            signOptions: { expiresIn: JWT_CONSTANT.expiresIn }
-        }),
-        WalletModule
-    ],
-    controllers: [
-        ApplicationController,
-        ApplicationAuthController
-    ],
-    providers: [
-        ApplicationService,
-        ApplicationAuthService,
-        BasicStrategy,
-        AuthJwtStrategy
-    ],
-    exports: [
-        ApplicationService,
-        ApplicationAuthService
-    ]
+  imports: [
+    MongooseModule.forFeature([
+      {
+        name: Application.name,
+        schema: ApplicationSchema
+      }
+    ]),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN')
+        }
+      })
+    }),
+    forwardRef(() => WalletModule),
+    forwardRef(() => FinancialTransactionModule)
+  ],
+  controllers: [ApplicationController],
+  providers: [ApplicationService, AuthJwtGuard, AuthJwtStrategy],
+  exports: [ApplicationService, JwtModule]
 })
 export class ApplicationModule {}

@@ -100,9 +100,14 @@ export class MtnTestController {
       const result = await this.mtnStrategy.buy(savedTransaction);
       console.log('MTN deposit result:', result);
       
+      // Vérifier si le résultat est valide et contient un statut PENDING
+      const isSuccess = result && 
+                       (result.status === 'PENDING' || 
+                        (result.error === FinancialTransactionErrorType.NO_ERROR));
+      
       return {
-        success: result.error === FinancialTransactionErrorType.NO_ERROR,
-        message: result.error === FinancialTransactionErrorType.NO_ERROR ? 'Deposit initiated successfully' : 'Failed to initiate deposit',
+        success: isSuccess,
+        message: isSuccess ? 'Deposit initiated successfully' : 'Failed to initiate deposit',
         data: {
           transactionId: savedTransaction._id,
           transactionRef: savedTransaction.ref,

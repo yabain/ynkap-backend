@@ -28,6 +28,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV || 'dev'}`
     }),
+    
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -45,9 +46,16 @@ import { DashboardModule } from './dashboard/dashboard.module';
         
         return {
           uri,
-          // Suppression des options dépréciées
-          // useNewUrlParser: true,
-          // useUnifiedTopology: true,
+          // Options de connexion optimisées
+          connectionFactory: (connection) => {
+            connection.on('connected', () => {
+              console.log('MongoDB connection established successfully');
+            });
+            connection.on('error', (err) => {
+              console.error('MongoDB connection error:', err);
+            });
+            return connection;
+          }
         };
       },
     }),
