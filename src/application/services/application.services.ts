@@ -3,6 +3,7 @@ import { DataBaseService } from "src/shared/database/database.service";
 import { Application, ApplicationDocument } from "../models/application.schema";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
 import { Connection, Model } from "mongoose";
+import * as mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import { WalletService } from "src/wallet/services/wallet.service";
@@ -170,8 +171,22 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
                 throw new NotFoundException(`Application avec l'ID ${id} non trouvée`);
             }
             
-            // Supprimer le portefeuille associé
-            await this.walletService.delete({ application: id });
+            // Convertir l'ID en ObjectId pour la recherche du portefeuille
+            const applicationObjectId = new mongoose.Types.ObjectId(id);
+            
+            // Vérifier le solde du portefeuille avant suppression
+            const wallet = await this.walletService.findOneByField({ application: applicationObjectId });
+            console.log('Portefeuille trouvé:', wallet);
+            console.log('Montant du portefeuille:', wallet?.amount);
+            
+            if (wallet && wallet.amount > 0) {
+                throw new BadRequestException(`Impossible de supprimer l'application. Le portefeuille contient encore ${wallet.amount} en fonds. Veuillez d'abord transférer tous les fonds.`);
+            }
+            
+            // Supprimer le portefeuille associé (s'il existe et n'a pas de fonds)
+            if (wallet) {
+                await this.walletService.delete({ application: applicationObjectId });
+            }
             
             // Supprimer l'application
             const result = await this.delete({ _id: id });
