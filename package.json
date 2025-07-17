@@ -20,8 +20,6 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "generate:mtn-keys": "ts-node -r tsconfig-paths/register src/scripts/generate-mtn-keys.ts",
     "test:payment-methods": "ts-node -r tsconfig-paths/register src/scripts/test-payment-methods.ts",
-    "seed:transactions": "ts-node -r tsconfig-paths/register src/scripts/seed-transactions.ts",
-    "seed:transaction-history": "ts-node -r tsconfig-paths/register src/scripts/seed-transaction-history.ts",
     "history:payments": "ts-node -r tsconfig-paths/register src/scripts/get-payment-history.ts",
     "fetch:transactions": "ts-node -r tsconfig-paths/register src/scripts/fetch-transaction-history.ts",
     "diagnose:transactions": "ts-node -r tsconfig-paths/register src/scripts/diagnose-transactions.ts",
@@ -34,7 +32,8 @@
     "generate:mtn-prod-keys": "ts-node -r tsconfig-paths/register src/scripts/generate-mtn-prod-keys.ts",
     "test:mtn-prod": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-prod.ts",
     "test:mtn-connectivity": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-connectivity.ts",
-    "test:wallet-payment": "ts-node -r tsconfig-paths/register src/scripts/test-wallet-payment.ts"
+    "test:wallet-payment": "ts-node -r tsconfig-paths/register src/scripts/test-wallet-payment.ts",
+    "seed:transactions-simple": "ts-node -r tsconfig-paths/register src/scripts/seed-transactions-simple.ts"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^25.0.4",
