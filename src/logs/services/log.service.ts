@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Log, LogDocument } from '../schemas/log.schema';
 import { CreateLogDto } from '../dto/create-log.dto';
+import { LogLevel } from '../enums/log-level.enum';
+import { LogType } from '../enums/log-type.enum';
 
 @Injectable()
 export class LogService {
@@ -165,7 +167,132 @@ export class LogService {
   async delete(id: string): Promise<any> {
     return this.logModel.findByIdAndDelete(id).exec();
   }
+
+  /**
+   * Crée un log d'action formaté
+   * @param action Action effectuée
+   * @param details Détails de l'action
+   * @param userId Utilisateur qui a effectué l'action
+   * @param metadata Métadonnées supplémentaires
+   */
+  async createActionLog(
+    action: string,
+    details: string,
+    userId?: string,
+    metadata?: Record<string, any>
+  ): Promise<LogDocument> {
+    const actionMessage = this.formatActionMessage(action, details, metadata);
+    
+    const createLogDto: CreateLogDto = {
+      level: LogLevel.INFO,
+      type: LogType.ACTION,
+      message: actionMessage,
+      user: userId,
+      metadata: {
+        action,
+        details,
+        timestamp: new Date().toISOString(),
+        ...metadata
+      }
+    };
+    
+    return this.create(createLogDto);
+  }
+
+  /**
+   * Formate le message d'action de manière standardisée selon le type d'opération
+   */
+  private formatActionMessage(action: string, details: string, metadata?: Record<string, any>): string {
+    const timestamp = new Date().toISOString();
+    
+    // Déterminer le type d'opération
+    let operationType = this.getOperationType(action, metadata);
+    
+    let message = `[${timestamp}] ${operationType}`;
+    
+    if (details) {
+      message += ` - ${details}`;
+    }
+    
+    // Ajouter des informations spécifiques selon le type
+    if (metadata?.amount) {
+      message += ` | Montant: ${metadata.amount} ${metadata.currency || 'XAF'}`;
+    }
+    
+    if (metadata?.transactionId) {
+      message += ` | Transaction: ${metadata.transactionId}`;
+    }
+    
+    if (metadata?.paymentMethod) {
+      message += ` | Méthode: ${metadata.paymentMethod}`;
+    }
+    
+    return message;
+  }
+
+  /**
+   * Détermine le type d'opération à afficher dans le log
+   */
+  private getOperationType(action: string, metadata?: Record<string, any>): string {
+    // Vérifier d'abord les métadonnées pour le type de transaction
+    if (metadata?.type) {
+      switch (metadata.type.toLowerCase()) {
+        case 'deposit':
+        case 'depot':
+          return 'DEPOT';
+        case 'withdrawal':
+        case 'retrait':
+          return 'RETRAIT';
+        case 'transfer':
+        case 'transfert':
+          return 'TRANSFERT';
+        case 'payment':
+        case 'paiement':
+          return 'PAIEMENT';
+        case 'refund':
+        case 'remboursement':
+          return 'REMBOURSEMENT';
+      }
+    }
+    
+    // Vérifier l'action pour déterminer le type
+    const actionLower = action.toLowerCase();
+    
+    if (actionLower.includes('deposit') || actionLower.includes('depot')) {
+      return 'DEPOT';
+    }
+    
+    if (actionLower.includes('withdrawal') || actionLower.includes('retrait')) {
+      return 'RETRAIT';
+    }
+    
+    if (actionLower.includes('transfer') || actionLower.includes('transfert')) {
+      return 'TRANSFERT';
+    }
+    
+    if (actionLower.includes('payment') || actionLower.includes('paiement')) {
+      return 'PAIEMENT';
+    }
+    
+    if (actionLower.includes('refund') || actionLower.includes('remboursement')) {
+      return 'REMBOURSEMENT';
+    }
+    
+    if (actionLower.includes('login') || actionLower.includes('connexion')) {
+      return 'CONNEXION';
+    }
+    
+    if (actionLower.includes('logout') || actionLower.includes('deconnexion')) {
+      return 'DECONNEXION';
+    }
+    
+    // Par défaut, retourner l'action en majuscules
+    return action.toUpperCase();
+  }
 }
+
+
+
 
 
 

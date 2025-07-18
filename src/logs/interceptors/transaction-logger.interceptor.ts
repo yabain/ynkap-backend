@@ -25,15 +25,38 @@ export class TransactionLoggerInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: (data) => {
-          // Vérifier si la réponse contient des informations de transaction
           if (data && (data.transactionId || data._id)) {
+            // Déterminer le type d'opération
+            let operationType = 'TRANSACTION';
+            if (data.type) {
+              switch (data.type.toLowerCase()) {
+                case 'deposit':
+                case 'depot':
+                  operationType = 'DEPOT';
+                  break;
+                case 'withdrawal':
+                case 'retrait':
+                  operationType = 'RETRAIT';
+                  break;
+                case 'transfer':
+                case 'transfert':
+                  operationType = 'TRANSFERT';
+                  break;
+                case 'payment':
+                case 'paiement':
+                  operationType = 'PAIEMENT';
+                  break;
+              }
+            }
+            
             this.logService.create({
               level: LogLevel.INFO,
               type: LogType.TRANSACTION,
-              message: `Transaction ${data.transactionId || data._id} effectuée avec succès`,
+              message: `${operationType} ${data.transactionId || data._id} effectué avec succès`,
               user: user,
               metadata: {
                 transactionId: data.transactionId || data._id,
+                operationType: operationType,
                 amount: data.amount,
                 currency: data.currency,
                 status: data.status || data.state,

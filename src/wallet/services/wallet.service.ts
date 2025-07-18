@@ -279,4 +279,38 @@
         this.logger.log(`Wallet updated successfully: ${updatedWallet.amount}`);
         return updatedWallet;
     }
+
+    /**
+     * Retire un montant du portefeuille
+     * @param appID ID de l'application
+     * @param amount Montant à retirer
+     * @returns Le portefeuille mis à jour
+     */
+    async withdrawFromWallet(appID: string, amount: number): Promise<WalletDocument> {
+        this.logger.log(`Withdrawing ${amount} from wallet for application ${appID}`);
+        
+        if (amount <= 0) {
+            throw new BadRequestException("Le montant à retirer doit être positif");
+        }
+        
+        const applicationId = typeof appID === 'string' 
+            ? new mongoose.Types.ObjectId(appID) 
+            : appID;
+
+        const wallet = await this.walletModel.findOne({ application: applicationId }).exec();
+        
+        if (!wallet) {
+            throw new NotFoundException(`Aucun portefeuille trouvé pour l'application ${appID}`);
+        }
+        
+        if (wallet.amount < amount) {
+            throw new BadRequestException(`Solde insuffisant. Solde actuel: ${wallet.amount}, montant demandé: ${amount}`);
+        }
+        
+        wallet.amount = wallet.amount - amount;
+        const updatedWallet = await wallet.save();
+        
+        this.logger.log(`Withdrawal successful. New balance: ${updatedWallet.amount}`);
+        return updatedWallet;
+    }
     }

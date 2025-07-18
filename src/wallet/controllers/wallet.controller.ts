@@ -60,4 +60,35 @@ export class WalletController {
       throw error;
     }
   }
+
+  @Put(':id/withdraw')
+  @ApiOperation({ summary: 'Withdraw amount from wallet' })
+  @ApiParam({ name: 'id', description: 'Application ID' })
+  @ApiBody({ 
+    schema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', minimum: 0.01 }
+      },
+      required: ['amount']
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Withdrawal successful' })
+  @ApiResponse({ status: 400, description: 'Insufficient funds or invalid amount' })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
+  async withdrawFromWallet(
+    @Param('id') appId: string,
+    @Body() withdrawData: { amount: number }
+  ) {
+    this.logger.log(`Request to withdraw ${withdrawData.amount} from wallet for application ID: ${appId}`);
+    
+    try {
+      const updatedWallet = await this.walletService.withdrawFromWallet(appId, withdrawData.amount);
+      this.logger.log(`Successfully withdrew from wallet for application ${appId}`);
+      return updatedWallet;
+    } catch (error) {
+      this.logger.error(`Error withdrawing from wallet for application ${appId}: ${error.message}`);
+      throw error;
+    }
+  }
 }

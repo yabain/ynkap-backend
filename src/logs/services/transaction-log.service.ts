@@ -127,15 +127,7 @@ export class TransactionLogService {
   }
 
   /**
-   * Enregistre un log de transaction avec limitation de taille
-   * @param transactionId ID de la transaction
-   * @param applicationId ID de l'application
-   * @param state État de la transaction
-   * @param type Type de transaction
-   * @param amount Montant de la transaction
-   * @param paymentMode Mode de paiement
-   * @param userId ID ou nom de l'utilisateur
-   * @param metadata Métadonnées additionnelles
+   * Enregistre un log de transaction avec formatage amélioré
    */
   async logTransaction(
     transactionId: string,
@@ -147,19 +139,40 @@ export class TransactionLogService {
     userId?: string,
     metadata?: Record<string, any>
   ): Promise<LogDocument> {
-    // Limiter la taille des métadonnées additionnelles
+    // Déterminer le type d'opération à afficher
+    let operationType = 'TRANSACTION';
+    switch (type.toLowerCase()) {
+      case 'deposit':
+      case 'depot':
+        operationType = 'DEPOT';
+        break;
+      case 'withdrawal':
+      case 'retrait':
+        operationType = 'RETRAIT';
+        break;
+      case 'transfer':
+      case 'transfert':
+        operationType = 'TRANSFERT';
+        break;
+      case 'payment':
+      case 'paiement':
+        operationType = 'PAIEMENT';
+        break;
+    }
+    
     const limitedMetadata = metadata ? this.limitObjectSize(metadata) : {};
     
     const log = new this.logModel({
       level: LogLevel.INFO,
       type: LogType.TRANSACTION,
-      message: `Transaction ${transactionId} - État: ${state} - Type: ${type} - Montant: ${amount}`,
+      message: `${operationType} ${transactionId} - État: ${state} - Montant: ${amount} XAF`,
       user: userId,
       metadata: {
         transactionId,
         applicationId,
         state,
         type,
+        operationType,
         amount,
         paymentMode,
         ...limitedMetadata

@@ -14,7 +14,7 @@ export class CreateLogDto {
 
   @ApiProperty({
     enum: LogType,
-    example: LogType.API,
+    example: LogType.ACTIVITY,
     description: 'Type de log'
   })
   @IsEnum(LogType)
@@ -50,6 +50,7 @@ export class CreateLogDto {
   @IsOptional()
   metadata?: Record<string, any>;
 }
+
 
 
 
