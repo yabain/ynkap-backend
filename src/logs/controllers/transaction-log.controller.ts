@@ -14,9 +14,6 @@ export class TransactionLogController {
   @Get()
   @Roles(['admin'])
   @ApiOperation({ summary: 'Récupérer tous les logs de transactions' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Nombre maximum de logs à récupérer' })
-  @ApiQuery({ name: 'skip', required: false, type: Number, description: 'Nombre de logs à sauter (pour la pagination)' })
-  @ApiResponse({ status: 200, description: 'Liste des logs de transactions' })
   async findAll(
     @Query('limit') limit?: number,
     @Query('skip') skip?: number,
@@ -24,8 +21,19 @@ export class TransactionLogController {
     const logs = await this.transactionLogService.findAll(limit, skip);
     const total = await this.transactionLogService.count();
     
+    // Formater les logs avec la structure unifiée
+    const formattedLogs = logs.map(log => ({
+      _id: log._id,
+      level: log.level,
+      type: log.type,
+      message: log.message,
+      user: log.user,
+      metadata: log.metadata,
+      createdAt: log.createdAt
+    }));
+    
     return {
-      data: logs,
+      data: formattedLogs,
       total,
       limit: limit || 0,
       skip: skip || 0
@@ -98,5 +106,6 @@ export class TransactionLogController {
     return header + rows.join('\n');
   }
 }
+
 
 

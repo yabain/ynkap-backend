@@ -84,6 +84,7 @@ export class PaymentService
                     financialTransaction.amount,
                     financialTransaction.paymentMode,
                     userId,
+                    undefined, // userName
                     { error: err.message }
                 );
             }

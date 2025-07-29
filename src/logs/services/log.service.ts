@@ -203,28 +203,23 @@ export class LogService {
    * Formate le message d'action de manière standardisée selon le type d'opération
    */
   private formatActionMessage(action: string, details: string, metadata?: Record<string, any>): string {
-    const timestamp = new Date().toISOString();
+    const timestamp = new Date().toLocaleString('fr-FR');
+    const user = metadata?.userId || metadata?.user || 'SYSTÈME';
     
-    // Déterminer le type d'opération
-    let operationType = this.getOperationType(action, metadata);
-    
-    let message = `[${timestamp}] ${operationType}`;
+    // Format plus clair: [DATE] UTILISATEUR a effectué ACTION - DÉTAILS
+    let message = `[${timestamp}] ${user} a effectué ${action}`;
     
     if (details) {
       message += ` - ${details}`;
     }
     
-    // Ajouter des informations spécifiques selon le type
-    if (metadata?.amount) {
-      message += ` | Montant: ${metadata.amount} ${metadata.currency || 'XAF'}`;
-    }
-    
+    // Ajouter contexte spécifique
     if (metadata?.transactionId) {
       message += ` | Transaction: ${metadata.transactionId}`;
     }
     
-    if (metadata?.paymentMethod) {
-      message += ` | Méthode: ${metadata.paymentMethod}`;
+    if (metadata?.amount) {
+      message += ` | Montant: ${metadata.amount} ${metadata.currency || 'XAF'}`;
     }
     
     return message;
@@ -290,6 +285,7 @@ export class LogService {
     return action.toUpperCase();
   }
 }
+
 
 
 

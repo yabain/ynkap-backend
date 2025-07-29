@@ -12,10 +12,6 @@ export class LogController {
 
   @Get()
   @ApiOperation({ summary: 'Récupérer tous les logs' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'skip', required: false, type: Number })
-  @ApiQuery({ name: 'filter', required: false, type: String, description: 'Filtre au format JSON' })
-  @ApiResponse({ status: 200, description: 'Liste des logs récupérée avec succès' })
   async findAll(
     @Query('limit') limit?: number,
     @Query('skip') skip?: number,
@@ -23,26 +19,34 @@ export class LogController {
   ) {
     let filter = {};
     
-    // Vérifier si filterStr est défini avant d'appeler split
     if (filterStr && typeof filterStr === 'string') {
       try {
         filter = JSON.parse(filterStr);
       } catch (error) {
-        // Si le parsing échoue, utiliser un filtre vide
         console.error('Erreur de parsing du filtre:', error);
       }
     }
     
-    // Limiter le nombre de logs récupérés si aucune limite n'est spécifiée
     if (!limit || limit > 100) {
-      limit = 100; // Limiter à 100 logs par défaut
+      limit = 100;
     }
     
     const logs = await this.logService.findAll(filter, limit, skip);
     const total = await this.logService.count(filter);
     
+    // Structure unifiée pour tous les logs
+    const formattedLogs = logs.map(log => ({
+      _id: log._id,
+      level: log.level,
+      type: log.type,
+      message: log.message,
+      user: log.user,
+      metadata: log.metadata,
+      createdAt: log.createdAt
+    }));
+    
     return {
-      data: logs,
+      data: formattedLogs,
       total,
       limit: limit || 0,
       skip: skip || 0
@@ -120,6 +124,7 @@ export class LogController {
     }));
   }
 }
+
 
 
 

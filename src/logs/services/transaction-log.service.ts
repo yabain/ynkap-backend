@@ -137,35 +137,33 @@ export class TransactionLogService {
     amount: number,
     paymentMode: string,
     userId?: string,
+    userName?: string,
     metadata?: Record<string, any>
   ): Promise<LogDocument> {
-    // Déterminer le type d'opération à afficher
-    let operationType = 'TRANSACTION';
-    switch (type.toLowerCase()) {
-      case 'deposit':
-      case 'depot':
-        operationType = 'DEPOT';
-        break;
-      case 'withdrawal':
-      case 'retrait':
-        operationType = 'RETRAIT';
-        break;
-      case 'transfer':
-      case 'transfert':
-        operationType = 'TRANSFERT';
-        break;
-      case 'payment':
-      case 'paiement':
-        operationType = 'PAIEMENT';
-        break;
+    const operationType = this.getOperationType(type);
+    const userInfo = userName ? `${userName} (${userId})` : userId || 'SYSTÈME';
+    const timestamp = new Date().toLocaleString('fr-FR');
+    
+    // Message très détaillé
+    let detailedMessage = `[${timestamp}] ${userInfo} - ${operationType} ${transactionId} | `;
+    detailedMessage += `État: ${state} | Montant: ${amount} XAF | Mode: ${paymentMode}`;
+    
+    if (metadata?.applicationName) {
+      detailedMessage += ` | Application: ${metadata.applicationName}`;
     }
     
-    const limitedMetadata = metadata ? this.limitObjectSize(metadata) : {};
+    if (metadata?.reference) {
+      detailedMessage += ` | Référence: ${metadata.reference}`;
+    }
     
+    if (metadata?.reason) {
+      detailedMessage += ` | Motif: ${metadata.reason}`;
+    }
+
     const log = new this.logModel({
-      level: LogLevel.INFO,
+      level: state === 'FAILED' || state.includes('ERROR') ? LogLevel.ERROR : LogLevel.INFO,
       type: LogType.TRANSACTION,
-      message: `${operationType} ${transactionId} - État: ${state} - Montant: ${amount} XAF`,
+      message: detailedMessage,
       user: userId,
       metadata: {
         transactionId,
@@ -174,8 +172,12 @@ export class TransactionLogService {
         type,
         operationType,
         amount,
+        currency: 'XAF',
         paymentMode,
-        ...limitedMetadata
+        userName,
+        userInfo,
+        timestamp: new Date().toISOString(),
+        ...metadata
       },
       createdAt: new Date()
     });
@@ -225,6 +227,31 @@ export class TransactionLogService {
     });
 
     return log.save();
+  }
+
+  /**
+   * Détermine le type d'opération à afficher dans le log
+   */
+  private getOperationType(type: string): string {
+    const typeLower = type.toLowerCase();
+    
+    if (typeLower.includes('deposit') || typeLower.includes('depot')) {
+      return 'DÉPÔT';
+    }
+    if (typeLower.includes('withdrawal') || typeLower.includes('retrait')) {
+      return 'RETRAIT';
+    }
+    if (typeLower.includes('transfer') || typeLower.includes('transfert')) {
+      return 'TRANSFERT';
+    }
+    if (typeLower.includes('payment') || typeLower.includes('paiement')) {
+      return 'PAIEMENT';
+    }
+    if (typeLower.includes('refund') || typeLower.includes('remboursement')) {
+      return 'REMBOURSEMENT';
+    }
+    
+    return 'TRANSACTION';
   }
 }
 

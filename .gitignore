@@ -3,8 +3,48 @@
 /node_modules
 /build
 
-#Secret folder
+# Secret folder
 /secrets
+
+# Environment variables - TOUS LES FICHIERS .env
+.env
+.env.*
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.dev
+.env.prod
+.env.staging
+.env.example
+*.env
+
+# Configuration files with sensitive data
+config.json
+config.*.json
+app-keys-*.json
+*-keys.json
+credentials.json
+secrets.json
+
+# API Keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+api-keys/
+certificates/
+
+# Database dumps and backups
+*.sql
+*.dump
+*.backup
+backup/
+dumps/
 
 # Logs
 npm-debug.log*
@@ -12,9 +52,11 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+*.log
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Tests
 /coverage
@@ -36,15 +78,6 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-.env.dev
-.env.prod
-
 # temp directory
 .temp
 .tmp
@@ -57,3 +90,20 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# AWS
+.aws/
+
+# Local development files
+local/
+dev-scripts/
+test-data/

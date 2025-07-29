@@ -5,6 +5,7 @@
 
 import * as readline from 'readline';
 import axios from 'axios';
+import { ConsoleLogger } from '@nestjs/common';
 
 // Fonction utilitaire pour poser une question et attendre la réponse
 function question(rl: readline.Interface, query: string): Promise<string> {
@@ -157,7 +158,7 @@ async function testWithdrawal(baseUrl: string, rl: readline.Interface, client: a
     const response = await client.post(`${baseUrl}/withdraw`, {
       phoneNumber,
       amount,
-      description: description || 'Test withdrawal'
+      description: description || 'Test de retrait'
     });
     
     console.log('Réponse:', JSON.stringify(response.data, null, 2));
@@ -209,6 +210,4 @@ async function checkConfig(baseUrl: string, client: any) {
     console.error('Erreur:', error.response?.data || error.message);
   }
 }
-
-// Démarrer le script
 bootstrap();
