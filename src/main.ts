@@ -6,20 +6,30 @@ import { GlobalExceptionFilter } from './shared/filters/global-exception.filter'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug'], // Activer tous les niveaux de log
+    logger: ['error', 'warn', 'log', 'debug'],
   });
   
-  // Configurer CORS
   app.enableCors({
-    origin: true, // Autoriser toutes les origines en développement
+    origin: process.env.NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') : true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
   
-  // Configurer les timeouts pour les requêtes HTTP - Augmenter à 120 secondes
+  // Configuration des timeouts avec gestion d'erreur
   app.use((req, res, next) => {
-    req.setTimeout(120000);
-    res.setTimeout(120000);
+    const timeout = parseInt(process.env.REQUEST_TIMEOUT || '120000');
+    req.setTimeout(timeout, () => {
+      res.status(408).json({ message: 'Request timeout' });
+    });
+    res.setTimeout(timeout);
+    next();
+  });
+  
+  // Middleware de sécurité
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
     next();
   });
   
@@ -38,7 +48,11 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   
   // Démarrer l'application
-  await app.listen(3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
-bootstrap();
+bootstrap().catch(err => {
+  console.error('Failed to start application:', err);
+  process.exit(1);
+});
