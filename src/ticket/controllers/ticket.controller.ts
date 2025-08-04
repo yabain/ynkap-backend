@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Put, Req, UseInterceptors } from "@nestjs/common";
 import { CreateTicketDTO } from "../dtos/create-ticket.dto";
+import { AddMessageDTO } from "../dtos/add-message.dto";
 import { TicketService } from "../services/ticket.services";
 import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
@@ -34,47 +35,86 @@ export class TicketController {
     }
 
     @Get('/user')
-    @CustomMessage("List of the tickets successfully retrieved for this user")
+    @CustomMessage("List of tickets successfully retrieved for this user")
     @ApiOperation({
-        summary: "Get all tickets of the connected user",
-        description: "This method returns the ticket list of the connected user, whether a normal user or an agent"
+        summary: "Get all tickets for current user",
+        description: "Retrieve all tickets for the current user"
     })
-    @ApiResponse({status: HttpStatus.OK, description: "List of tickets created by the logged-in user"})
+    @ApiResponse({status: HttpStatus.OK, description: "List of tickets for current user"})
     @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
+
+    async getTicketsForUser(@Req() req: Request) {
+        return await this.ticketService.getTicketsForUser(req);
+    }
+
+    @Post(':id/messages')
+    @CustomMessage("Message successfully added to ticket")
+    @ApiOperation({
+        summary: "Add a message to a ticket",
+        description: "This method adds a new message to an existing ticket, including optional attachments and related FAQs"
+    })
+    @ApiResponse({status: HttpStatus.CREATED, description: "Message successfully added to ticket"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket not found"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "User not authorized to add message to this ticket"})
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
 
-    async getTicketsForUSer(@Req() req: Request){
-        return await this.ticketService.getTicketsForUSer(req);
+    async addMessageToTicket(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Body() messageDto: AddMessageDTO,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.addMessageToTicket(ticketId, messageDto, req);
+    }
+
+    @Get(':id/messages')
+    @CustomMessage("Messages successfully retrieved")
+    @ApiOperation({
+        summary: "Get all messages for a ticket",
+        description: "This method retrieves all messages associated with a specific ticket"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "List of messages for the ticket"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket not found"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "User not authorized to view messages"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+
+    async getTicketMessages(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.getTicketMessages(ticketId, req);
+    }
+
+    @Put(':id/status')
+    @CustomMessage("Ticket status successfully updated")
+    @ApiOperation({
+        summary: "Update ticket status",
+        description: "This method updates the status of a ticket and sends notifications"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Ticket status updated successfully"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket not found"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "User not authorized to update status"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+
+    async updateTicketStatus(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Body() statusDto: UpdateStatusTicketDTO,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.updateTicketStatus(ticketId, statusDto, req);
     }
 
     @Get('user/:status')
-    @CustomMessage(`List of the tickets with the status specified successfully retrieved for this user`)
+    @CustomMessage(`List of tickets with specified status successfully retrieved for this user`)
     @ApiOperation({
-        summary: "Get all tickets of the connected user by a specific status(the name of the status)",
-        description: "This method returns a list of tickets with the status specified by the logged-in user"
+        summary: "Get tickets by status for current user",
+        description: "Retrieve tickets for the current user filtered by status"
     })
-    @ApiResponse({status: HttpStatus.OK, description: "List of tickets with the specified status of the logged-in user"})
+    @ApiResponse({status: HttpStatus.OK, description: "List of tickets with specified status"})
     @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
-    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
 
-    async getTicketsUsersByStatus(@Req() req: Request, @Param("status") status: TicketTypes) {
-        return await this.ticketService.getTicketsUsersByStatus(req, status);
-    }
-
-    
-    @Put(':id')
-    @CustomMessage("Status successfully updated")
-    @ApiOperation({
-        summary: "Update ticket status",
-        description: "Update ticket status using ticket id"
-    })
-    @ApiResponse({status: HttpStatus.OK, description: "Ticket status has been updated correctly"})
-    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "Current status does not allow transition to specified status"})
-    @ApiResponse({status: HttpStatus.FORBIDDEN, description: "User does not have permission to modify status"})
-    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
-    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
-
-    async updateStatusTicket(@Param("id", ObjectIDValidationPipe) id: any, @Body() updateStatusDtos: UpdateStatusTicketDTO, @Req() req:Request) {
-        return await this.ticketService.updateTicketStatus(id, updateStatusDtos, req)
+    async getTicketsByStatus(@Req() req: Request, @Param("status") status: string) {
+        return await this.ticketService.getTicketsByStatus(req, status);
     }
 }

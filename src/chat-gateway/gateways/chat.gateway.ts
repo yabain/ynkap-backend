@@ -37,7 +37,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect{
         @ConnectedSocket() client: Socket, 
         @MessageBody("ticket", ObjectIDValidationPipe) ticketID: mongoose.Types.ObjectId) {
             try {
-                await this.ticketService.isTicketExist(ticketID);
+                await this.ticketService.isTicketExist(ticketID.toString());
 
                 //Création d'une room pour les utilisateurs concernés par le ticket
                 client.join(ticketID.toString())
