@@ -83,4 +83,8 @@ export class FinancialTransactionService extends DataBaseService<FinancialTransa
             throw error;
         }
     }
+
+    async aggregate(pipeline: any[]): Promise<any[]> {
+        return await this.financialTransactionModel.aggregate(pipeline).exec();
+    }
 }

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TransactionDTO {
   @ApiProperty({ description: 'ID de la transaction', example: '60d21b4667d0d8992e610c85' })
@@ -27,6 +27,23 @@ export class TransactionDTO {
 
   @ApiProperty({ description: 'ID de l\'application', example: '60d21b4667d0d8992e610c86' })
   application: string;
+
+  @ApiProperty({ description: 'Année de la transaction', example: 2024 })
+  year: number;
+}
+
+export class TransactionsByYearDTO {
+  @ApiProperty({ description: 'Année', example: 2024 })
+  year: number;
+
+  @ApiProperty({ description: 'Nombre de transactions', example: 150 })
+  count: number;
+
+  @ApiProperty({ description: 'Montant total', example: 750000 })
+  totalAmount: number;
+
+  @ApiProperty({ description: 'Transactions de l\'année', type: [TransactionDTO] })
+  transactions: TransactionDTO[];
 }
 
 export class DashboardStatsDTO {
@@ -43,15 +60,23 @@ export class DashboardStatsDTO {
   paymentMethod: string;
 
   @ApiProperty({
-    description: 'Toutes les transactions pour toutes les applications d\'un utilisateur',
-    type: [TransactionDTO]
+    description: 'Transactions groupées par année',
+    type: [TransactionsByYearDTO]
   })
-  allTransactionOfAllApplicationForAnUser: TransactionDTO[];
+  transactionsByYear: TransactionsByYearDTO[];
 
   @ApiProperty({
     description: 'Nombre d\'applications créées par l\'utilisateur',
     example: 3
   })
   numberOfApplication: number;
+
+  @ApiProperty({
+    description: 'Années disponibles pour le filtrage',
+    type: [Number],
+    example: [2022, 2023, 2024, 2025]
+  })
+  availableYears: number[];
 }
+
 

@@ -19,6 +19,6 @@ import { FinancialTransactionModule } from 'src/financial-transaction/financial-
   ],
   controllers: [WalletController],
   providers: [WalletService],
-  exports: [WalletService]
+  exports: [WalletService] // ✅ Important : exporter WalletService
 })
-    export class WalletModule {}
+export class WalletModule {}

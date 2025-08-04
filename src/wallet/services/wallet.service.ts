@@ -1,13 +1,13 @@
-    import { BadRequestException, HttpStatus, Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
-    import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-    import { Connection, Model, ClientSession } from 'mongoose';
-    import mongoose from 'mongoose';
-    import { Wallet, WalletDocument } from '../models/wallet.schema';
-    import { DataBaseService } from 'src/shared/database';
-    import { ApplicationService } from 'src/application/services';
+import { BadRequestException, HttpStatus, Injectable, NotFoundException, Inject, forwardRef, Logger } from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, ClientSession } from 'mongoose';
+import mongoose from 'mongoose';
+import { Wallet, WalletDocument } from '../models/wallet.schema';
+import { DataBaseService } from 'src/shared/database';
+import { ApplicationService } from 'src/application/services';
 
-    @Injectable()
-    export class WalletService extends DataBaseService<WalletDocument> {
+@Injectable()
+export class WalletService extends DataBaseService<WalletDocument> {
     private readonly logger = new Logger(WalletService.name);
 
     constructor(

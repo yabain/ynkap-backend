@@ -5,6 +5,7 @@ import { FinancialTransactionService } from '../../financial-transaction/service
 import { DashboardStatsDTO, TransactionDTO } from '../dtos/dashboard-stats.dto';
 import { Request } from 'express';
 import { PaymentStrategyType } from '../../financial-payment/enum/finance.enum';
+import * as mongoose from 'mongoose';
 
 @Injectable()
 export class DashboardService {
@@ -14,35 +15,35 @@ export class DashboardService {
     private readonly financialTransactionService: FinancialTransactionService
   ) {}
 
-  async getDashboardStats(req: Request): Promise<DashboardStatsDTO> {
-    // Utiliser any pour accéder aux propriétés de l'utilisateur
+  async getDashboardStats(req: Request, filterYear?: number, limit: number = 100): Promise<DashboardStatsDTO> {
     const user = req.user as any;
     const userId = user?.sub;
     
-    // Vérifier si l'utilisateur est admin
     const isAdmin = user?.resource_access?.['y-nkap']?.roles?.includes('admin');
     
-    // Obtenir le nombre d'utilisateurs (pour les admins) ou 1 pour les utilisateurs normaux
     const amountOfUser = isAdmin 
       ? await this.getUserCount() 
       : 1;
     
-    // Obtenir la méthode de paiement la plus utilisée par l'utilisateur
     const paymentMethod = await this.getMostUsedPaymentMethod(userId);
     
-    // Obtenir les applications de l'utilisateur
     const applications = await this.getApplications(req);
     const numberOfApplication = applications.length;
     
-    // Obtenir toutes les transactions pour toutes les applications de l'utilisateur
     const appIds = applications.map(app => app._id.toString());
-    const allTransactionOfAllApplicationForAnUser = await this.getAllTransactions(appIds);
+    
+    // Obtenir les transactions groupées par année
+    const transactionsByYear = await this.getTransactionsByYear(appIds, filterYear, limit);
+    
+    // Obtenir les années disponibles
+    const availableYears = await this.getAvailableYears(appIds);
     
     return {
       amountOfUser,
       paymentMethod,
-      allTransactionOfAllApplicationForAnUser,
-      numberOfApplication
+      transactionsByYear,
+      numberOfApplication,
+      availableYears
     };
   }
   
@@ -67,29 +68,99 @@ export class DashboardService {
     }
   }
   
-  private async getAllTransactions(appIds: string[]): Promise<TransactionDTO[]> {
-    // Implémentation pour obtenir toutes les transactions
+  private async getTransactionsByYear(appIds: string[], filterYear?: number, limit: number = 100) {
     try {
       if (!appIds.length) return [];
       
-      const transactions = await this.financialTransactionService.findByField({
-        application: { $in: appIds }
-      });
+      // Pipeline d'agrégation MongoDB
+      const pipeline: any[] = [
+        {
+          $match: {
+            application: { $in: appIds.map(id => new mongoose.Types.ObjectId(id)) }
+          }
+        },
+        {
+          $addFields: {
+            year: { $year: "$createdAt" }
+          }
+        }
+      ];
+
+      // Filtrer par année si spécifiée
+      if (filterYear) {
+        pipeline.push({
+          $match: { year: filterYear }
+        });
+      }
+
+      // Grouper par année
+      pipeline.push(
+        {
+          $group: {
+            _id: "$year",
+            count: { $sum: 1 },
+            totalAmount: { $sum: "$amount" },
+            transactions: { 
+              $push: {
+                _id: "$_id",
+                ref: "$ref",
+                amount: "$amount",
+                moneyCode: "$moneyCode",
+                state: "$state",
+                type: "$type",
+                paymentMode: "$paymentMode",
+                createdAt: "$createdAt",
+                application: "$application",
+                year: "$year"
+              }
+            }
+          }
+        },
+        {
+          $sort: { _id: -1 } // Trier par année décroissante
+        }
+      );
+
+      const results = await this.financialTransactionService.aggregate(pipeline);
       
-      // Transformer les documents en objets DTO
-      return transactions.map(transaction => ({
-        _id: transaction._id.toString(),
-        ref: transaction.ref,
-        amount: transaction.amount,
-        moneyCode: transaction.moneyCode,
-        state: transaction.state,
-        type: transaction.type,
-        paymentMode: transaction.paymentMode,
-        createdAt: transaction.createdAt,
-        application: transaction.application.toString()
+      return results.map(result => ({
+        year: result._id,
+        count: result.count,
+        totalAmount: result.totalAmount,
+        transactions: result.transactions.slice(0, limit) // Limiter le nombre de transactions
       }));
+      
     } catch (error) {
-      console.error('Error getting transactions:', error);
+      console.error('Error getting transactions by year:', error);
+      return [];
+    }
+  }
+
+  private async getAvailableYears(appIds: string[]): Promise<number[]> {
+    try {
+      if (!appIds.length) return [];
+      
+      const pipeline = [
+        {
+          $match: {
+            application: { $in: appIds.map(id => new mongoose.Types.ObjectId(id)) }
+          }
+        },
+        {
+          $group: {
+            _id: { $year: "$createdAt" }
+          }
+        },
+        {
+          $sort: { _id: -1 }
+        }
+      ];
+
+      const results = await this.financialTransactionService.aggregate(pipeline);
+      return results.map(result => result._id);
+      
+    } catch (error) {
+      console.error('Error getting available years:', error);
       return [];
     }
   }
@@ -142,5 +213,6 @@ export class DashboardService {
     }
   }
 }
+
 
 
