@@ -21,8 +21,8 @@ export class TicketStatusHistory extends Document {
     @Prop({type: mongoose.Types.ObjectId, ref: Ticket.name, required: true})
     ticket: Ticket;
 
-    @Prop({required: true})
-    statusBefore: string;
+    @Prop({required: false, default: null})
+    statusBefore: string | null;
 
     @Prop({required: true})
     statusAfter: string;
