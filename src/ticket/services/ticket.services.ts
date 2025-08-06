@@ -137,6 +137,7 @@ export class TicketService extends DataBaseService<TicketDocument> {
      */
     async getTicketsForUser(req: any): Promise<Ticket[]> {
         const roles = req['user']['realm_access']['roles'];
+        const userId = req['user']['sub'];
 
         // Check if user is a solver/agent (has any solver role)
         const isSolver = roles.some(role => 
@@ -145,18 +146,44 @@ export class TicketService extends DataBaseService<TicketDocument> {
             role.includes('admin')
         );
 
-        // For regular users (no solver roles), show tickets they created
-        // For solvers/agents, show tickets assigned to them
-        const queryField = isSolver
-            ? { assignTo: req['user']['sub'] }  // Show tickets assigned to this agent
-            : { user: req['user']['sub'] };     // Show tickets created by this user
+        let tickets: Ticket[] = [];
+
+        if (isSolver) {
+            // For solvers/agents, show both tickets they created AND tickets assigned to them
+            tickets = await this.findByField({
+                $or: [
+                    { user: userId },        // Tickets they created
+                    { assignTo: userId }     // Tickets assigned to them
+                ]
+            });
+
+            // Add ownership information to distinguish between created and assigned tickets
+            tickets = tickets.map(ticket => {
+                const ticketObj = ticket.toObject();
+                return {
+                    ...ticketObj,
+                    isOwnedByUser: ticket.user === userId,
+                    isAssignedToUser: ticket.assignTo === userId
+                };
+            });
+        } else {
+            // For regular users, show only tickets they created
+            tickets = await this.findByField({ user: userId });
+            
+            // Add ownership information
+            tickets = tickets.map(ticket => {
+                const ticketObj = ticket.toObject();
+                return {
+                    ...ticketObj,
+                    isOwnedByUser: true,
+                    isAssignedToUser: false
+                };
+            });
+        }
 
         console.log('User roles:', roles);
         console.log('Is solver:', isSolver);
-        console.log('User ID:', req['user']['sub']);
-        console.log('Query field:', queryField);
-
-        const tickets = await this.findByField(queryField);
+        console.log('User ID:', userId);
         console.log('Found tickets:', tickets.length);
         
         return tickets;
@@ -170,6 +197,7 @@ export class TicketService extends DataBaseService<TicketDocument> {
      */
     async getTicketsByStatus(req: any, status: string): Promise<Ticket[]> {
         const roles = req['user']['realm_access']['roles'];
+        const userId = req['user']['sub'];
         const normalizedStatus = status.toUpperCase() as TicketStatus;
 
         // Check if user is a solver/agent (has any solver role)
@@ -179,14 +207,52 @@ export class TicketService extends DataBaseService<TicketDocument> {
             role.includes('admin')
         );
 
-        const queryField = isSolver
-            ? { assignTo: req['user']['sub'] }  // Show tickets assigned to this agent
-            : { user: req['user']['sub'] };     // Show tickets created by this user
+        let tickets: Ticket[] = [];
 
-        return this.findByField({
-            ...queryField,
-            status: normalizedStatus
-        });
+        if (isSolver) {
+            // For solvers/agents, show both tickets they created AND tickets assigned to them
+            tickets = await this.findByField({
+                $or: [
+                    { user: userId },        // Tickets they created
+                    { assignTo: userId }     // Tickets assigned to them
+                ],
+                status: normalizedStatus
+            });
+
+            // Add ownership information to distinguish between created and assigned tickets
+            tickets = tickets.map(ticket => {
+                const ticketObj = ticket.toObject();
+                return {
+                    ...ticketObj,
+                    isOwnedByUser: ticket.user === userId,
+                    isAssignedToUser: ticket.assignTo === userId
+                };
+            });
+        } else {
+            // For regular users, show only tickets they created
+            tickets = await this.findByField({
+                user: userId,
+                status: normalizedStatus
+            });
+            
+            // Add ownership information
+            tickets = tickets.map(ticket => {
+                const ticketObj = ticket.toObject();
+                return {
+                    ...ticketObj,
+                    isOwnedByUser: true,
+                    isAssignedToUser: false
+                };
+            });
+        }
+
+        console.log('User roles:', roles);
+        console.log('Is solver:', isSolver);
+        console.log('User ID:', userId);
+        console.log('Status filter:', normalizedStatus);
+        console.log('Found tickets:', tickets.length);
+
+        return tickets;
     }
 
     /**
@@ -242,9 +308,10 @@ export class TicketService extends DataBaseService<TicketDocument> {
         }
 
         const isUserTicketOwner = ticket.user === req['user']['sub'];
+        const isUserAssignedAgent = ticket.assignTo === req['user']['sub'];
         const isUserAdmin = req['user']['realm_access']['roles'].includes('admin');
 
-        if (!isUserTicketOwner && !isUserAdmin) {
+        if (!isUserTicketOwner && !isUserAssignedAgent && !isUserAdmin) {
             throw new ForbiddenException('You are not authorized to add messages to this ticket');
         }
 
@@ -268,6 +335,7 @@ export class TicketService extends DataBaseService<TicketDocument> {
 
         await ticket.save();
 
+        // Send notification to the other party (not the sender)
         const recipientId = isUserTicketOwner ? ticket.assignTo : ticket.user;
         await this.sendNotification(
             recipientId,
@@ -280,34 +348,50 @@ export class TicketService extends DataBaseService<TicketDocument> {
 
     /**
      * Get messages for a ticket
-     * @param ticketId Ticket ID
-     * @param req Request object containing user information
-     * @returns Ticket messages
-     */
-    /**
-     * Get messages for a ticket
      * @param ticketId ID of the ticket
      * @param req Request object containing user information
      * @returns Array of ticket messages
      */
     async getTicketMessages(ticketId: string, req: any): Promise<any[]> {
+        console.log('Getting messages for ticket:', ticketId);
+        console.log('User ID:', req['user']['sub']);
+        
         const ticket = await this.findOneByField({ _id: ticketId });
         if (!ticket) {
             throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
         }
 
+        console.log('Found ticket:', {
+            id: ticket._id,
+            title: ticket.title,
+            user: ticket.user,
+            assignTo: ticket.assignTo,
+            messagesCount: ticket.messages?.length || 0
+        });
+
         const isUserTicketOwner = ticket.user === req['user']['sub'];
         const isUserAssignedAgent = ticket.assignTo === req['user']['sub'];
         const isUserAdmin = req['user']['realm_access']['roles'].includes('admin');
+
+        console.log('Authorization check:', {
+            isUserTicketOwner,
+            isUserAssignedAgent,
+            isUserAdmin,
+            userRoles: req['user']['realm_access']['roles']
+        });
 
         if (!isUserTicketOwner && !isUserAssignedAgent && !isUserAdmin) {
             throw new ForbiddenException('You are not authorized to view messages for this ticket');
         }
 
         console.log('Ticket messages:', ticket.messages);
-        console.log('Number of messages:', ticket.messages.length);
+        console.log('Number of messages:', ticket.messages?.length || 0);
         
-        return ticket.messages;
+        if (ticket.messages && ticket.messages.length > 0) {
+            console.log('First message:', ticket.messages[0]);
+        }
+        
+        return ticket.messages || [];
     }
 
     /**
