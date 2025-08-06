@@ -26,6 +26,7 @@
     "test:logs": "ts-node -r tsconfig-paths/register src/scripts/test-logs.ts",
     "test:transaction-logs": "ts-node -r tsconfig-paths/register src/scripts/test-transaction-logs.ts",
     "test:mtn-routes": "npx ts-node -r tsconfig-paths/register src/scripts/test-mtn-routes.ts",
+    "test:mtn-routes-prod": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-routes.ts",
     "extract:app-keys": "ts-node -r tsconfig-paths/register src/scripts/extract-app-keys.ts",
     "convert:logs-to-capped": "ts-node -r tsconfig-paths/register src/scripts/convert-logs-to-capped.ts",
     "check:transactions": "ts-node -r tsconfig-paths/register src/scripts/check-transactions.ts",
@@ -34,7 +35,8 @@
     "test:mtn-connectivity": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-connectivity.ts",
     "test:wallet-payment": "ts-node -r tsconfig-paths/register src/scripts/test-wallet-payment.ts",
     "seed:transactions-simple": "ts-node -r tsconfig-paths/register src/scripts/seed-transactions-simple.ts",
-    "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts"
+    "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts",
+    "test:mtn-direct": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-direct.ts"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^25.0.4",

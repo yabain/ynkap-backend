@@ -6,21 +6,13 @@
 # Secret folder
 /secrets
 
-# Environment variables - TOUS LES FICHIERS .env
+# Environment files
 .env
-.env.*
 .env.local
-.env.development
-.env.development.local
-.env.test
-.env.test.local
-.env.production
-.env.production.local
 .env.dev
 .env.prod
+.env.production
 .env.staging
-.env.example
-*.env
 
 # Configuration files with sensitive data
 config.json
@@ -29,6 +21,9 @@ app-keys-*.json
 *-keys.json
 credentials.json
 secrets.json
+
+# MTN credentials
+mtn-*-credentials-*.json
 
 # API Keys and certificates
 *.pem
