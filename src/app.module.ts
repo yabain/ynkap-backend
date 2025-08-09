@@ -13,11 +13,12 @@ import { MessageModule } from './message/message.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { FinancialTransactionModule } from './financial-transaction/financial-transaction.module';
 import { FinancialPaymentModule } from './financial-payment/financial-payment.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
     SharedModule,
-    UserModule, 
+    UserModule,
     ApplicationModule,
     WalletModule,
     MessageModule,
@@ -25,8 +26,8 @@ import { FinancialPaymentModule } from './financial-payment/financial-payment.mo
     GatewayModule,
     PaymentMethodsModule,
     FinancialTransactionModule,
-    FinancialPaymentModule
-    // NotificationModule
+    FinancialPaymentModule,
+    NotificationsModule
   ],
   controllers: [AppController],
   providers: [

@@ -12,7 +12,7 @@ export class Notification {
   @Prop({ required: true })
   message: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: String, required: true }) // Keycloak user IDs are UUIDs (strings), not ObjectIds
   userId: string;
 
   @Prop({ 

@@ -9,6 +9,7 @@ import { KeycloakApiService } from "../keycloak/keycloak-api.service";
 import { TicketStatusHistory, TicketStatusHistorySchema } from "./models/ticket-modification-history.schema";
 import { SharedModule } from "src/shared/shared.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { MessageModule } from "../message/message.module";
 
 @Module({
     imports: [
@@ -24,7 +25,8 @@ import { NotificationsModule } from "../notifications/notifications.module";
         ]),
         HttpModule,
         SharedModule,
-        NotificationsModule
+        NotificationsModule,
+        MessageModule
     ],
     controllers: [TicketController],
     exports: [TicketService],

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Put, Req, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Put, Req, UseInterceptors } from "@nestjs/common";
 import { CreateTicketDTO } from "../dtos/create-ticket.dto";
 import { AddMessageDTO } from "../dtos/add-message.dto";
 import { TicketService } from "../services/ticket.services";
@@ -48,6 +48,24 @@ export class TicketController {
         return await this.ticketService.getTicketsForUser(req);
     }
 
+    @Get(':id')
+    @CustomMessage("Ticket successfully retrieved")
+    @ApiOperation({
+        summary: "Get a single ticket by ID",
+        description: "Retrieve a single ticket with user information populated"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Ticket successfully retrieved"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket not found"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
+
+    async getTicketById(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.getTicketByIdWithUserInfo(ticketId, req);
+    }
+
     @Post(':id/messages')
     @CustomMessage("Message successfully added to ticket")
     @ApiOperation({
@@ -83,6 +101,25 @@ export class TicketController {
         @Req() req: Request
     ) {
         return await this.ticketService.getTicketMessages(ticketId, req);
+    }
+
+    @Delete(':id/messages/:messageId')
+    @CustomMessage("Message successfully deleted")
+    @ApiOperation({
+        summary: "Delete a message from a ticket",
+        description: "This method deletes a specific message from a ticket. Users can only delete their own messages."
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Message successfully deleted"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket or message not found"})
+    @ApiResponse({status: HttpStatus.FORBIDDEN, description: "User not authorized to delete this message"})
+    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured"})
+
+    async deleteMessage(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Param('messageId', ObjectIDValidationPipe) messageId: string,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.deleteMessage(ticketId, messageId, req);
     }
 
     @Put(':id/status')

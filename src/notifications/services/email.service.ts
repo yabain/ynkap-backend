@@ -13,26 +13,81 @@ export class EmailService {
   }
 
   private initializeTransporter() {
+    // Check if SMTP configuration is provided
+    const smtpHost = this.configService.get<string>('SMTP_HOST');
+    const smtpUser = this.configService.get<string>('SMTP_USER');
+    const smtpPass = this.configService.get<string>('SMTP_PASS');
+
+    // SMTP configuration validation
+    this.logger.log('Initializing email service...');
+
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      this.logger.warn('SMTP configuration not provided. Email notifications will be disabled.');
+      this.logger.warn('To enable email notifications, please configure SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables.');
+      return;
+    }
+
+    const smtpPort = this.configService.get<number>('SMTP_PORT', 587);
+    const smtpSecure = this.configService.get<boolean>('SMTP_SECURE', false);
+
     const smtpConfig = {
-      host: this.configService.get<string>('SMTP_HOST'),
-      port: this.configService.get<number>('SMTP_PORT'),
-      secure: this.configService.get<boolean>('SMTP_SECURE', false), // true for 465, false for other ports
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure, // true for 465 (SSL), false for 587 (STARTTLS)
       auth: {
-        user: this.configService.get<string>('SMTP_USER'),
-        pass: this.configService.get<string>('SMTP_PASS'),
+        user: smtpUser,
+        pass: smtpPass,
       },
+      // Different TLS config based on port
+      ...(smtpPort === 465 ? {
+        // For SSL port 465
+        tls: {
+          rejectUnauthorized: false,
+          servername: 'smtp.gmail.com'
+        }
+      } : {
+        // For STARTTLS port 587
+        requireTLS: true,
+        tls: {
+          rejectUnauthorized: false,
+          ciphers: 'SSLv3'
+        }
+      })
     };
+
+    this.logger.log(` SMTP transporter initialized (${smtpHost}:${smtpPort})`);
 
     this.transporter = nodemailer.createTransport(smtpConfig);
 
-    // Verify connection configuration
-    this.transporter.verify((error, success) => {
-      if (error) {
-        this.logger.error('SMTP connection failed:', error);
-      } else {
-        this.logger.log('SMTP server is ready to send emails');
-      }
-    });
+    // Test the connection with a simple approach
+    this.logger.log('SMTP transporter initialized. Testing connection...');
+
+    // Try to verify connection with timeout
+    const verifyWithTimeout = () => {
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          this.logger.warn('SMTP verification timed out. Emails will be sent without verification.');
+          resolve(false);
+        }, 10000); // 10 second timeout
+
+        this.transporter.verify((error) => {
+          clearTimeout(timeout);
+          if (error) {
+            this.logger.warn(`SMTP verification failed: ${error.message}`);
+            this.logger.warn('Emails will still be attempted. This might be a temporary network issue.');
+            resolve(false);
+          } else {
+            this.logger.log(' SMTP server connection verified successfully');
+            resolve(true);
+          }
+        });
+      });
+    };
+
+    // Run verification in background
+    setTimeout(() => {
+      verifyWithTimeout();
+    }, 2000); // Wait 2 seconds before verifying
   }
 
   /**
@@ -43,6 +98,11 @@ export class EmailService {
     creatorEmail: string,
     creatorName: string
   ): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.warn('SMTP not configured. Skipping ticket creation notification email.');
+      return false;
+    }
+
     try {
       const mailOptions = {
         from: `"Y-Nkap Support" <${this.configService.get<string>('SMTP_FROM_EMAIL')}>`,
@@ -51,7 +111,7 @@ export class EmailService {
         html: this.generateTicketCreationEmailForCreator(ticket, creatorName),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
+      await this.transporter.sendMail(mailOptions);
       this.logger.log(`Ticket creation notification sent to creator: ${creatorEmail}`);
       return true;
     } catch (error) {
@@ -68,6 +128,11 @@ export class EmailService {
     agentEmail: string,
     agentName: string
   ): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.warn('SMTP not configured. Skipping ticket assignment notification email.');
+      return false;
+    }
+
     try {
       const mailOptions = {
         from: `"Y-Nkap Support" <${this.configService.get<string>('SMTP_FROM_EMAIL')}>`,
@@ -76,7 +141,7 @@ export class EmailService {
         html: this.generateTicketAssignmentEmailForAgent(ticket, agentName),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
+      await this.transporter.sendMail(mailOptions);
       this.logger.log(`Ticket assignment notification sent to agent: ${agentEmail}`);
       return true;
     } catch (error) {
@@ -216,6 +281,11 @@ export class EmailService {
     htmlContent: string,
     from?: string
   ): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.warn('SMTP not configured. Skipping email send.');
+      return false;
+    }
+
     try {
       const mailOptions = {
         from: from || `"Y-Nkap Support" <${this.configService.get<string>('SMTP_FROM_EMAIL')}>`,
@@ -224,7 +294,7 @@ export class EmailService {
         html: htmlContent,
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
+      await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email sent successfully to: ${to}`);
       return true;
     } catch (error) {
@@ -236,32 +306,45 @@ export class EmailService {
   /**
    * Test email configuration
    */
-  async testEmailConfiguration(): Promise<boolean> {
-    try {
-      const testEmail = this.configService.get<string>('SMTP_TEST_EMAIL');
-      if (!testEmail) {
-        this.logger.warn('SMTP_TEST_EMAIL not configured, skipping test');
-        return false;
-      }
+  // async testEmailConfiguration(): Promise<boolean> {
+  //   if (!this.transporter) {
+  //     this.logger.warn('SMTP not configured. Cannot test email configuration.');
+  //     return false;
+  //   }
 
-      const mailOptions = {
-        from: `"Y-Nkap Support" <${this.configService.get<string>('SMTP_FROM_EMAIL')}>`,
-        to: testEmail,
-        subject: 'Y-Nkap Email Configuration Test',
-        html: `
-          <h2>Email Configuration Test</h2>
-          <p>This is a test email to verify that the email configuration is working correctly.</p>
-          <p>If you receive this email, the email service is properly configured.</p>
-          <p>Timestamp: ${new Date().toISOString()}</p>
-        `,
-      };
+  //   try {
+  //     const testEmail = this.configService.get<string>('SMTP_TEST_EMAIL');
+  //     if (!testEmail) {
+  //       this.logger.warn('SMTP_TEST_EMAIL not configured, skipping test');
+  //       return false;
+  //     }
 
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log('Email configuration test successful');
-      return true;
-    } catch (error) {
-      this.logger.error(`Email configuration test failed: ${error.message}`);
-      return false;
-    }
-  }
+  //     this.logger.log(' Testing email configuration...');
+
+  //     const mailOptions = {
+  //       from: `"Y-Nkap Support" <${this.configService.get<string>('SMTP_FROM_EMAIL')}>`,
+  //       to: testEmail,
+  //       subject: 'Y-Nkap Email Configuration Test',
+  //       html: `
+  //         <h2> Email Configuration Test Successful!</h2>
+  //         <p>This is a test email to verify that the email configuration is working correctly.</p>
+  //         <p>If you receive this email, the email service is properly configured.</p>
+  //         <p><strong>Configuration Details:</strong></p>
+  //         <ul>
+  //           <li>SMTP Host: ${this.configService.get<string>('SMTP_HOST')}</li>
+  //           <li>SMTP Port: ${this.configService.get<string>('SMTP_PORT')}</li>
+  //           <li>From Email: ${this.configService.get<string>('SMTP_FROM_EMAIL')}</li>
+  //         </ul>
+  //         <p>Timestamp: ${new Date().toISOString()}</p>
+  //       `,
+  //     };
+
+  //     await this.transporter.sendMail(mailOptions);
+  //     this.logger.log(' Email configuration test successful! Check your inbox.');
+  //     return true;
+  //   } catch (error) {
+  //     this.logger.error(` Email configuration test failed: ${error.message}`);
+  //     return false;
+  //   }
+  // }
 } 

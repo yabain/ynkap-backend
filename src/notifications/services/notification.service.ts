@@ -12,7 +12,7 @@ export class NotificationService {
 
   constructor(
     @InjectModel(Notification.name) private notificationModel: Model<NotificationDocument>,
-    private emailService: EmailService
+    public emailService: EmailService // Make public so it can be accessed from TicketService
   ) {}
 
   /**

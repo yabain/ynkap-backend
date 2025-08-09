@@ -11,6 +11,9 @@ import { NotificationService } from "../../notifications/services/notification.s
 import { AddMessageDTO } from "../dtos/add-message.dto";
 import { UpdateStatusTicketDTO } from "../dtos/update-status-ticket.dto";
 import { CreateTicketDTO } from "../dtos/create-ticket.dto";
+import { EnhancedTicket, UserInfo } from "../interfaces/enhanced-ticket.interface";
+import { MessageService } from "../../message/services/message.service";
+import { NotificationType } from "../../notifications/dto/create-notification.dto";
 
 /**
  * Service for handling ticket-related operations
@@ -23,7 +26,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
         @InjectConnection() connection: Connection,
         private keycloakApiService: KeycloakApiService,
         private ticketHistoryService: TicketHistoryService,
-        private notificationService: NotificationService
+        private notificationService: NotificationService,
+        private messageService: MessageService
     ) {
         super(ticketModel, connection);
     }
@@ -81,7 +85,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
                     content: createTicketDto.description,
                     createdAt: new Date(),
                     attachments: [],
-                    relatedFaqs: []
+                    relatedFaqs: [],
+                    isDescription: true  // Mark this as the ticket description message
                 };
 
                 const newTicket = this.createInstance({
@@ -103,19 +108,66 @@ export class TicketService extends DataBaseService<TicketDocument> {
                 // Send comprehensive notifications (database + email)
                 try {
                     // Get user information for notifications
+                    console.log(' Getting user info for notifications...');
+                    console.log('  - Creator ID:', req['user']['sub']);
+                    console.log('  - Agent ID:', solver);
+
                     const creatorInfo = await this.getUserInfo(req['user']['sub']);
                     const agentInfo = await this.getUserInfo(solver);
-                    
+
+                    console.log('  - Creator info found:', creatorInfo ? 'YES' : 'NO');
+                    console.log('  - Agent info found:', agentInfo ? 'YES' : 'NO');
+
+                    if (creatorInfo) {
+                        console.log('  - Creator email:', creatorInfo.email);
+                    }
+                    if (agentInfo) {
+                        console.log('  - Agent email:', agentInfo.email);
+                    }
+
+                    // Send notifications - handle missing agent info gracefully
                     if (creatorInfo && agentInfo) {
+                        // Both users found - send both notifications
+                        console.log(' Sending notifications to both creator and agent');
                         await this.notificationService.sendTicketCreationNotifications(
                             newTicket,
                             req['user']['sub'], // creator user ID
                             creatorInfo.email,
-                            creatorInfo.name,
+                            this.getDisplayName(creatorInfo),
                             solver, // agent user ID
                             agentInfo.email,
-                            agentInfo.name
+                            this.getDisplayName(agentInfo)
                         );
+                    } else if (creatorInfo) {
+                        // Only creator info found - send creator notification only
+                        console.log(' Sending notification to creator only (agent info not found)');
+                        console.warn(' Agent information not found due to Keycloak API issues');
+                        console.warn(' Agent will not receive notification, but ticket creation continues');
+
+                        // Create individual notifications manually
+                        await this.notificationService.createNotification({
+                            title: 'Ticket Created Successfully',
+                            message: `Your ticket "${newTicket.title}" has been created and assigned to a support agent.`,
+                            type: NotificationType.TICKET,
+                            userId: req['user']['sub'],
+                            relatedEntityType: 'TICKET',
+                            relatedEntityId: newTicket._id.toString(),
+                        });
+
+                        // Send email to creator
+                        await this.notificationService.emailService.sendTicketCreationNotificationToCreator(
+                            newTicket,
+                            creatorInfo.email,
+                            this.getDisplayName(creatorInfo)
+                        );
+
+                        // Log agent notification failure for monitoring
+                        console.log(` MONITORING: Agent notification failed for ticket ${newTicket._id} due to Keycloak API issues`);
+
+                    } else {
+                        console.error(' Both creator and agent information not found - likely Keycloak API outage');
+                        console.error(' No notifications sent, but ticket creation continues');
+                        console.log(` MONITORING: All notifications failed for ticket ${newTicket._id} due to Keycloak API issues`);
                     }
                 } catch (notificationError) {
                     console.error('Failed to send notifications:', notificationError);
@@ -131,18 +183,18 @@ export class TicketService extends DataBaseService<TicketDocument> {
     }
 
     /**
-     * Get tickets for a user based on their role
+     * Get tickets for a user based on their role with user information populated
      * @param req Request object containing user information
-     * @returns Array of tickets
+     * @returns Array of tickets with user details
      */
-    async getTicketsForUser(req: any): Promise<Ticket[]> {
+    async getTicketsForUser(req: any): Promise<EnhancedTicket[]> {
         const roles = req['user']['realm_access']['roles'];
         const userId = req['user']['sub'];
 
         // Check if user is a solver/agent (has any solver role)
-        const isSolver = roles.some(role => 
-            role.includes('solver') || 
-            role.includes('manager') || 
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
             role.includes('admin')
         );
 
@@ -156,54 +208,76 @@ export class TicketService extends DataBaseService<TicketDocument> {
                     { assignTo: userId }     // Tickets assigned to them
                 ]
             });
-
-            // Add ownership information to distinguish between created and assigned tickets
-            tickets = tickets.map(ticket => {
-                const ticketObj = ticket.toObject();
-                return {
-                    ...ticketObj,
-                    isOwnedByUser: ticket.user === userId,
-                    isAssignedToUser: ticket.assignTo === userId
-                };
-            });
         } else {
             // For regular users, show only tickets they created
             tickets = await this.findByField({ user: userId });
-            
-            // Add ownership information
-            tickets = tickets.map(ticket => {
-                const ticketObj = ticket.toObject();
-                return {
-                    ...ticketObj,
-                    isOwnedByUser: true,
-                    isAssignedToUser: false
-                };
-            });
         }
 
         console.log('User roles:', roles);
         console.log('Is solver:', isSolver);
         console.log('User ID:', userId);
         console.log('Found tickets:', tickets.length);
-        
-        return tickets;
+
+        // Enhance tickets with user information
+        const enhancedTickets = await Promise.all(
+            tickets.map(async (ticket) => {
+                const ticketObj = ticket.toObject() as any;
+
+                // Get creator info
+                const creatorInfo = await this.getUserInfo(ticket.user);
+                if (creatorInfo) {
+                    ticketObj.createdBy = {
+                        _id: creatorInfo._id,
+                        username: creatorInfo.username,
+                        email: creatorInfo.email,
+                        firstName: creatorInfo.firstName,
+                        lastName: creatorInfo.lastName,
+                        roles: creatorInfo.roles
+                    };
+                }
+
+                // Note: assignedTo field removed from frontend interface
+
+                // Enhance messages with sender info
+                if (ticketObj.messages && ticketObj.messages.length > 0) {
+                    ticketObj.messages = await Promise.all(
+                        ticketObj.messages.map(async (message: any) => {
+                            const senderInfo = await this.getUserInfo(message.sender);
+                            return {
+                                ...message,
+                                senderName: senderInfo ? this.getDisplayName(senderInfo) : 'Unknown User',
+                                senderEmail: senderInfo?.email || ''
+                            };
+                        })
+                    );
+                }
+
+                // Add ownership information
+                ticketObj.isOwnedByUser = ticket.user === userId;
+                ticketObj.isAssignedToUser = ticket.assignTo === userId;
+
+                return ticketObj;
+            })
+        );
+
+        return enhancedTickets;
     }
 
     /**
-     * Get tickets for a user by status
+     * Get tickets for a user by status with user information populated
      * @param req Request object containing user information
      * @param status Ticket status to filter by
-     * @returns Array of tickets
+     * @returns Array of tickets with user details
      */
-    async getTicketsByStatus(req: any, status: string): Promise<Ticket[]> {
+    async getTicketsByStatus(req: any, status: string): Promise<EnhancedTicket[]> {
         const roles = req['user']['realm_access']['roles'];
         const userId = req['user']['sub'];
         const normalizedStatus = status.toUpperCase() as TicketStatus;
 
         // Check if user is a solver/agent (has any solver role)
-        const isSolver = roles.some(role => 
-            role.includes('solver') || 
-            role.includes('manager') || 
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
             role.includes('admin')
         );
 
@@ -218,31 +292,11 @@ export class TicketService extends DataBaseService<TicketDocument> {
                 ],
                 status: normalizedStatus
             });
-
-            // Add ownership information to distinguish between created and assigned tickets
-            tickets = tickets.map(ticket => {
-                const ticketObj = ticket.toObject();
-                return {
-                    ...ticketObj,
-                    isOwnedByUser: ticket.user === userId,
-                    isAssignedToUser: ticket.assignTo === userId
-                };
-            });
         } else {
             // For regular users, show only tickets they created
             tickets = await this.findByField({
                 user: userId,
                 status: normalizedStatus
-            });
-            
-            // Add ownership information
-            tickets = tickets.map(ticket => {
-                const ticketObj = ticket.toObject();
-                return {
-                    ...ticketObj,
-                    isOwnedByUser: true,
-                    isAssignedToUser: false
-                };
             });
         }
 
@@ -252,7 +306,100 @@ export class TicketService extends DataBaseService<TicketDocument> {
         console.log('Status filter:', normalizedStatus);
         console.log('Found tickets:', tickets.length);
 
-        return tickets;
+        // Enhance tickets with user information
+        const enhancedTickets = await Promise.all(
+            tickets.map(async (ticket) => {
+                const ticketObj = ticket.toObject() as any;
+
+                // Get creator info
+                const creatorInfo = await this.getUserInfo(ticket.user);
+                if (creatorInfo) {
+                    ticketObj.createdBy = {
+                        _id: creatorInfo._id,
+                        username: creatorInfo.username,
+                        email: creatorInfo.email,
+                        firstName: creatorInfo.firstName,
+                        lastName: creatorInfo.lastName,
+                        roles: creatorInfo.roles
+                    };
+                }
+
+                // Note: assignedTo field removed from frontend interface
+
+                // Enhance messages with sender info
+                if (ticketObj.messages && ticketObj.messages.length > 0) {
+                    ticketObj.messages = await Promise.all(
+                        ticketObj.messages.map(async (message: any) => {
+                            const senderInfo = await this.getUserInfo(message.sender);
+                            return {
+                                ...message,
+                                senderName: senderInfo ? this.getDisplayName(senderInfo) : 'Unknown User',
+                                senderEmail: senderInfo?.email || ''
+                            };
+                        })
+                    );
+                }
+
+                // Add ownership information
+                ticketObj.isOwnedByUser = ticket.user === userId;
+                ticketObj.isAssignedToUser = ticket.assignTo === userId;
+
+                return ticketObj;
+            })
+        );
+
+        return enhancedTickets;
+    }
+
+    /**
+     * Get a single ticket by ID with user information populated
+     * @param ticketId Ticket ID
+     * @param req Request object containing user information
+     * @returns Ticket with user details
+     */
+    async getTicketByIdWithUserInfo(ticketId: string, req: any): Promise<EnhancedTicket> {
+        const ticket = await this.findOneByField({ _id: ticketId });
+        if (!ticket) {
+            throw new NotFoundException('Ticket not found');
+        }
+
+        const ticketObj = ticket.toObject() as any;
+
+        // Get creator info
+        const creatorInfo = await this.getUserInfo(ticket.user);
+        if (creatorInfo) {
+            ticketObj.createdBy = {
+                _id: creatorInfo._id,
+                username: creatorInfo.username,
+                email: creatorInfo.email,
+                firstName: creatorInfo.firstName,
+                lastName: creatorInfo.lastName,
+                roles: creatorInfo.roles
+            };
+        }
+
+        // Note: assignedTo field removed from frontend interface
+
+        // Enhance messages with sender info
+        if (ticketObj.messages && ticketObj.messages.length > 0) {
+            ticketObj.messages = await Promise.all(
+                ticketObj.messages.map(async (message: any) => {
+                    const senderInfo = await this.getUserInfo(message.sender);
+                    return {
+                        ...message,
+                        senderName: senderInfo ? this.getDisplayName(senderInfo) : 'Unknown User',
+                        senderEmail: senderInfo?.email || ''
+                    };
+                })
+            );
+        }
+
+        // Add ownership information
+        const userId = req['user']['sub'];
+        ticketObj.isOwnedByUser = ticket.user === userId;
+        ticketObj.isAssignedToUser = ticket.assignTo === userId;
+
+        return ticketObj;
     }
 
     /**
@@ -289,6 +436,24 @@ export class TicketService extends DataBaseService<TicketDocument> {
             ticket.status = newStatus;
             await ticket.save({ session });
             await this.ticketHistoryService.createHistory(ticket._id, currentStatus, newStatus, req['user']['sub']);
+
+            // Send status update notifications
+            try {
+                const ticketOwnerInfo = await this.getUserInfo(ticket.user);
+                if (ticketOwnerInfo) {
+                    await this.notificationService.sendTicketStatusUpdateNotification(
+                        ticket,
+                        ticket.user,
+                        ticketOwnerInfo.email,
+                        this.getDisplayName(ticketOwnerInfo),
+                        currentStatus,
+                        newStatus
+                    );
+                }
+            } catch (notificationError) {
+                console.error('Failed to send status update notifications:', notificationError);
+                // Don't fail status update if notifications fail
+            }
         }).catch((error) => {
             throw error;
         });
@@ -395,25 +560,67 @@ export class TicketService extends DataBaseService<TicketDocument> {
     }
 
     /**
-     * Get user information from Keycloak using the admin API
-     * @param userId User ID to get information for
-     * @returns User information with email and name
+     * Get display name from user info
+     * @param userInfo User information object
+     * @returns Display name string
      */
-    private async getUserInfo(userId: string): Promise<{ email: string; name: string } | null> {
-        try {
-            // Use the Keycloak API to get user details
-            const userDetails = await this.keycloakApiService.getUserById(userId);
-            if (userDetails) {
-                return {
-                    email: userDetails.email || `user-${userId}@example.com`,
-                    name: `${userDetails.firstName || ''} ${userDetails.lastName || ''}`.trim() || userDetails.username || `User ${userId}`
-                };
+    public getDisplayName(userInfo: UserInfo): string {
+        const fullName = [userInfo.firstName, userInfo.lastName].filter(Boolean).join(' ').trim();
+        return fullName || userInfo.username || 'Unknown User';
+    }
+
+    /**
+     * Get user information from Keycloak using the admin API with retry logic
+     * @param userId User ID to get information for
+     * @returns User information with email and username
+     */
+    public async getUserInfo(userId: string): Promise<UserInfo | null> {
+        const maxRetries = 3;
+        const retryDelay = 1000; // 1 second
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(` Attempting to get user info for ${userId} (attempt ${attempt}/${maxRetries})`);
+
+                // Use the Keycloak API to get user details
+                const userDetails = await this.keycloakApiService.getUserById(userId);
+
+                if (userDetails) {
+                    console.log(` Successfully retrieved user info for ${userId}`);
+                    return {
+                        _id: userId,
+                        username: userDetails.username || `User ${userId}`,
+                        email: userDetails.email || `user-${userId}@example.com`,
+                        firstName: userDetails.firstName,
+                        lastName: userDetails.lastName,
+                        roles: userDetails.roles || []
+                    };
+                }
+
+                console.log(` User details not found for ${userId}`);
+                return null;
+
+            } catch (error) {
+                console.error(` Attempt ${attempt} failed for user ${userId}:`, error.message);
+
+                // Check if it's a network/server error that might be temporary
+                const isRetryableError = error.code === 'ECONNRESET' ||
+                                       error.response?.status >= 500 ||
+                                       error.message.includes('socket hang up') ||
+                                       error.message.includes('Proxy Error');
+
+                if (attempt === maxRetries || !isRetryableError) {
+                    console.error(` ${isRetryableError ? 'All retries failed' : 'Non-retryable error'} for user ${userId}`);
+                    return null;
+                }
+
+                // Wait before retrying
+                console.log(` Waiting ${retryDelay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
             }
-            return null;
-        } catch (error) {
-            console.error(`Failed to get user info for ${userId}:`, error);
-            return null;
         }
+
+        return null;
     }
 
     /**
@@ -430,6 +637,95 @@ export class TicketService extends DataBaseService<TicketDocument> {
             console.log(`Notification sent to user ${userId}: ${title} - ${message}`);
         } catch (error) {
             throw new Error(`Failed to send notification: ${error.message}`);
+        }
+    }
+
+    /**
+     * Delete a message from a ticket
+     * @param ticketId ID of the ticket
+     * @param messageId ID of the message to delete
+     * @param req Request object containing user information
+     * @returns Success message
+     */
+    async deleteMessage(ticketId: string, messageId: string, req: any): Promise<any> {
+        try {
+            console.log(' Deleting message:', messageId, 'from ticket:', ticketId);
+            console.log(' User ID:', req['user']['sub']);
+
+            // Verify ticket exists
+            console.log(' Looking for ticket with ID:', ticketId);
+            const ticket = await this.findOneByField({ _id: ticketId });
+            console.log(' Ticket found:', ticket ? 'YES' : 'NO');
+
+            if (!ticket) {
+                console.error(' Ticket not found in database');
+                throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+            }
+
+        // Get the message from the Message collection
+        console.log(' Looking for message with ID:', messageId);
+        const message = await this.messageService.getMessageById(messageId);
+        console.log(' Message found:', message ? 'YES' : 'NO');
+
+        if (!message) {
+            console.error(' Message not found in database');
+            throw new NotFoundException(`Message with ID ${messageId} not found`);
+        }
+
+        // Verify the message belongs to the ticket
+        // Convert both IDs to strings for proper comparison
+        const ticketIdString = ticketId.toString();
+        const messageTicketIdString = message.ticket.toString();
+
+        console.log(' Ticket ID comparison:');
+        console.log('  - URL ticket ID:', ticketId);
+        console.log('  - URL ticket ID (string):', ticketIdString);
+        console.log('  - Message ticket ID:', message.ticket);
+        console.log('  - Message ticket ID (string):', messageTicketIdString);
+        console.log('  - Are they equal?', messageTicketIdString === ticketIdString);
+
+        if (messageTicketIdString !== ticketIdString) {
+            console.error(' Ticket ID mismatch!');
+            console.error('  - Expected:', ticketIdString);
+            console.error('  - Got:', messageTicketIdString);
+            throw new BadRequestException('Message does not belong to this ticket');
+        }
+
+        console.log(' Message to delete:', {
+            id: message._id,
+            sender: message.sender,
+            content: message.content?.substring(0, 50) + '...',
+            isDescription: message.isDescription,
+            createdAt: message.createdAt
+        });
+
+        // Check authorization - users can only delete their own messages
+        const isMessageOwner = message.sender === req['user']['sub'];
+        const isUserAdmin = req['user']['realm_access']['roles'].includes('admin');
+
+        if (!isMessageOwner && !isUserAdmin) {
+            throw new ForbiddenException('You can only delete your own messages');
+        }
+
+        // Don't allow deletion of ticket description
+        if (message.isDescription) {
+            throw new ForbiddenException('Cannot delete ticket description');
+        }
+
+        // Delete the message using MessageService with socket emission
+        await this.messageService.deleteMessageWithSocketEmission(messageId, ticketId);
+        console.log(' Message deleted successfully from database');
+
+        return {
+            message: 'Message deleted successfully',
+            deletedMessageId: messageId,
+            ticketId: ticketId
+        };
+
+        } catch (error) {
+            console.error(' Error in deleteMessage:', error);
+            console.error(' Error stack:', error.stack);
+            throw error; // Re-throw the error so it's handled by NestJS
         }
     }
 }

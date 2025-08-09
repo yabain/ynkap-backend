@@ -29,6 +29,30 @@ export class Message extends Document {
 
     @Prop({default: () => Date.now()})
     createdAt: Date;
+
+    // Reply functionality
+    @Prop({type: mongoose.Types.ObjectId, ref: Message.name, default: null})
+    replyTo: Message;
+
+    @Prop({default: false})
+    isReply: boolean;
+
+    // Message tagging/mentioning
+    @Prop({type: [String], default: []})
+    mentionedUsers: string[];
+
+    @Prop({type: [String], default: []})
+    tags: string[];
+
+    // Message metadata
+    @Prop({default: false})
+    isSystem: boolean;
+
+    @Prop({default: false})
+    isDescription: boolean;
+
+    @Prop({type: [String], default: []})
+    attachments: string[];
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message)
