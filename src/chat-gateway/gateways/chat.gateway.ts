@@ -33,6 +33,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect{
         console.log(`The client ${client.id} has logged out`)
     }
 
+    // Test handler to verify WebSocket communication
+    @SubscribeMessage('test')
+    async handleTest(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+        console.log(`🧪 TEST EVENT received from client ${client.id}:`, data);
+        client.emit('testResponse', { message: 'Test successful', clientId: client.id });
+        return { success: true };
+    }
+
     // Initialisation d'une nouvelle consersation
     @SubscribeMessage('joinConversation')
     async handleJoinConversation(
@@ -63,13 +71,27 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect{
 
     //Envoi d'un message
     @SubscribeMessage('sendMessage')
-    @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+    @UsePipes(new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        exceptionFactory: (errors) => {
+            console.log(`📨 ❌ VALIDATION ERRORS:`, errors);
+            return new Error(`Validation failed: ${errors.map(e => Object.values(e.constraints || {}).join(', ')).join('; ')}`);
+        }
+    }))
     async handleNewMessage(
         @ConnectedSocket() client: Socket,
         @MessageBody() createMessageDtos : CreateMessageDTO,
         ){
             try {
-                console.log(`📨 Handling new message for ticket ${createMessageDtos.ticket} from sender ${createMessageDtos.sender}`);
+                console.log(`📨 ✅ RECEIVED sendMessage event from client ${client.id}`);
+                console.log(`📨 Raw message data:`, createMessageDtos);
+                console.log(`📨 Message validation - ticket: ${createMessageDtos.ticket}, sender: ${createMessageDtos.sender}`);
+                console.log(`📨 Message content: ${createMessageDtos.content?.substring(0, 50)}...`);
+                console.log(`📨 Reply info - isReply: ${createMessageDtos.isReply}, replyTo: ${createMessageDtos.replyTo}`);
+
+                console.log(`📨 Processing new message for ticket ${createMessageDtos.ticket} from sender ${createMessageDtos.sender}`);
 
                 // Get ticket info to check current status and sender role
                 const ticket = await this.ticketService.findOneByField({ _id: createMessageDtos.ticket });
@@ -111,9 +133,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect{
                 });
 
             } catch (error) {
-                console.error({ error: error.message});
-                client.emit('error', { message: 'Une erreur s\'est produite lors de l\'envoi de nouveaux messages'});
-                throw error;
+                console.error(`📨 ❌ ERROR processing message:`, error);
+                console.error(`📨 ❌ Error details:`, {
+                    message: error.message,
+                    stack: error.stack,
+                    clientId: client.id,
+                    messageData: createMessageDtos
+                });
+
+                // Send specific error back to client
+                client.emit('messageError', {
+                    message: 'Failed to send message: ' + error.message,
+                    error: error.message
+                });
+
+                // Don't throw - just log and continue
+                console.error(`📨 ❌ Message sending failed for client ${client.id}`);
             }
     }
 

@@ -32,6 +32,18 @@ export class MessageService extends DataBaseService<MessageDocument> {
             // Populate the reply information if it's a reply
             if (newMessage.replyTo) {
                 await newMessage.populate('replyTo');
+
+                // Add replyToMessage field for frontend compatibility
+                const replyToData = newMessage.replyTo as any;
+                (newMessage as any).replyToMessage = {
+                    _id: replyToData._id,
+                    content: replyToData.content,
+                    sender: replyToData.sender,
+                    senderName: replyToData.senderName, // Will be undefined, frontend will resolve
+                    createdAt: replyToData.createdAt
+                };
+
+                console.log(`✅ Added replyToMessage field to new message ${newMessage._id}`);
             }
 
             return newMessage;
