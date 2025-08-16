@@ -7,13 +7,15 @@ import * as mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import { WalletService } from "src/wallet/services/wallet.service";
+import { ApplicationKeyService } from './application-key.service';
 
 @Injectable()
 export class ApplicationService extends DataBaseService<ApplicationDocument> {
     constructor(
         @InjectModel(Application.name) private applicationModel: Model<ApplicationDocument>,
         @InjectConnection() connection: Connection,
-        @Inject(forwardRef(() => WalletService)) private walletService: WalletService
+        @Inject(forwardRef(() => WalletService)) private walletService: WalletService,
+        private applicationKeyService: ApplicationKeyService
     ){
         super(applicationModel, connection, ['paymentMethods'])
     }
@@ -33,24 +35,28 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
                     privateKeyTest: this.generateSecureKey()
                 });
                 
-                console.log('Nouvelle application créée:', newApplication);
-                
                 await newApplication.save({session});
-                console.log('Application sauvegardée avec ID:', newApplication._id);
+                
+                // Sauvegarder les clés en base
+                await this.applicationKeyService.createKey({
+                    applicationId: newApplication._id.toString(),
+                    environment: 'test',
+                    permissions: { payments: true, wallet: true, messages: true }
+                });
+                
+                await this.applicationKeyService.createKey({
+                    applicationId: newApplication._id.toString(),
+                    environment: 'prod',
+                    permissions: { payments: true, wallet: true, messages: true }
+                });
                 
                 const wallet = await this.walletService.create({application: newApplication._id}, session);
-                console.log('Portefeuille créé:', wallet);
                 
                 return newApplication;
             } catch (error) {
                 console.error('Erreur lors de la création de l\'application:', error);
                 throw error;
             }
-        }).catch((error) => {
-            console.error('Erreur capturée dans executeWithTransaction:', error);
-            if (error.code == 11000)
-                throw new ConflictException(`Une application avec le champ ${Object.keys(error.keyPattern)[0]} existe déjà`);
-            throw error;
         });
     }
 
@@ -67,18 +73,30 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
 
     async generateApiKeys(appId: string, environment: 'test' | 'prod' = 'test'): Promise<ApplicationDocument> {
         return this.executeWithTransaction(async (session) => {
-            const updateData: any = {};
-            
-            if (environment === 'prod') {
-                updateData.clientIdProd = uuidv4();
-                updateData.privateKeyProd = this.generateSecureKey();
-            } else {
-                updateData.clientIdTest = uuidv4();
-                updateData.privateKeyTest = this.generateSecureKey(); 
+            try {
+                // Générer nouvelles clés via ApplicationKeyService
+                const { applicationKey, privateKey } = await this.applicationKeyService.createKey({
+                    applicationId: appId,
+                    environment,
+                    permissions: { payments: true, wallet: true, messages: true }
+                });
+                
+                // Mettre à jour l'application avec les nouvelles clés
+                const updateData: any = {};
+                if (environment === 'prod') {
+                    updateData.clientIdProd = applicationKey.clientId;
+                    updateData.privateKeyProd = privateKey;
+                } else {
+                    updateData.clientIdTest = applicationKey.clientId;
+                    updateData.privateKeyTest = privateKey;
+                }
+                
+                const updatedApp = await this.update({ _id: appId }, updateData, session);
+                return updatedApp;
+            } catch (error) {
+                console.error(`Erreur génération clés ${environment}:`, error);
+                throw error;
             }
-            
-            const updatedApp = await this.update({ _id: appId }, updateData, session);
-            return updatedApp;
         });
     }
 
@@ -197,5 +215,18 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
             console.error('Erreur lors de la suppression de l\'application:', error);
             throw error;
         }
+    }
+
+    async getApplicationKeys(appId: string): Promise<any> {
+        const keys = await this.applicationKeyService.getApplicationKeys(appId);
+        return keys.map(key => ({
+            id: key._id,
+            clientId: key.clientId,
+            environment: key.environment,
+            isActive: key.isActive,
+            permissions: key.permissions,
+            createdAt: (key as any).createdAt,
+            expiresAt: key.expiresAt
+        }));
     }
 }

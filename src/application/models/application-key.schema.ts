@@ -13,7 +13,7 @@ export class ApplicationKey extends Document {
   clientId: string;
 
   @Prop({ required: true })
-  privateKeyHash: string; // Hash bcrypt de la clé privée
+  privateKeyHash: string;
 
   @Prop({ required: true, enum: ['test', 'prod'] })
   environment: 'test' | 'prod';
@@ -48,11 +48,10 @@ export class ApplicationKey extends Document {
     requestsPerMinute: number;
     requestsPerHour: number;
   };
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const ApplicationKeySchema = SchemaFactory.createForClass(ApplicationKey);
 
-// Index pour optimiser les recherches
-ApplicationKeySchema.index({ clientId: 1 });
-ApplicationKeySchema.index({ applicationId: 1, environment: 1 });
-ApplicationKeySchema.index({ isActive: 1 });

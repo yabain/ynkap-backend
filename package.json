@@ -36,7 +36,12 @@
     "test:wallet-payment": "ts-node -r tsconfig-paths/register src/scripts/test-wallet-payment.ts",
     "seed:transactions-simple": "ts-node -r tsconfig-paths/register src/scripts/seed-transactions-simple.ts",
     "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts",
-    "test:mtn-direct": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-direct.ts"
+    "test:mtn-direct": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-direct.ts",
+    "test:payment-prod": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-production-payment.ts",
+    "test:mtn-prod-safe": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-prod-safe.ts",
+    "check:prod-config": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/check-mtn-prod-status.ts",
+    "test:mtn-prod-fixed": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-production-payment.ts",
+    "generate:app-test-keys": "ts-node -r tsconfig-paths/register src/scripts/generate-app-test-keys.ts"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^25.0.4",

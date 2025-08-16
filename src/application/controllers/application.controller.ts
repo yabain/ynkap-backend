@@ -28,6 +28,7 @@ import { Request } from "express";
 import { KeyAuditService } from '../services/key-audit.service';
 import { AuditEventType } from '../models/key-audit.schema';
 import { KeyRotationService } from '../services/key-rotation.service';
+import { Roles } from 'src/keycloak/keycloak.decorator';
 
 @Controller('applications')
 @ApiTags('Applications')
@@ -156,30 +157,12 @@ export class ApplicationController {
     }
 
     @Post(':id/regenerate-keys')
-    @ApiOperation({ summary: 'Regenerate API keys for an application' })
-    @ApiParam({ name: 'id', description: 'Application ID' })
-    @ApiBody({ 
-        schema: { 
-            type: 'object', 
-            properties: { 
-                environment: { 
-                    type: 'string', 
-                    enum: ['test', 'prod'],
-                    description: 'Environment for which to regenerate keys'
-                }
-            },
-            required: ['environment']
-        }
-    })
-    @ApiResponse({status: HttpStatus.OK, description: "Keys regenerated successfully"})
-    @ApiResponse({status: HttpStatus.BAD_REQUEST, description: "Invalid environment or request"})
-    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Application not found"})
-    @ApiResponse({status: HttpStatus.FORBIDDEN, description: "User does not have permission to regenerate keys"})
-    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    @Roles(['admin', 'user'])
+    @ApiOperation({ summary: 'Régénérer les clés API d\'une application' })
     async regenerateKeys(
-        @Param('id', ObjectIDValidationPipe) id: string,
-        @Body() body: { environment: 'prod' | 'test' },
-        @Req() req
+        @Param('id') id: string,
+        @Body() body: { environment: 'test' | 'prod' },
+        @Req() req: any
     ) {
         const { environment } = body;
         
@@ -188,7 +171,7 @@ export class ApplicationController {
         }
         
         try {
-            const result = await this.applicationService.regenerateKeys(id, environment, req);
+            const result = await this.applicationService.generateApiKeys(id, environment);
             
             return {
                 success: true,
@@ -197,7 +180,6 @@ export class ApplicationController {
                     applicationId: id,
                     environment,
                     clientId: environment === 'prod' ? result.clientIdProd : result.clientIdTest,
-                    // Ne pas exposer la clé privée dans la réponse pour des raisons de sécurité
                     keyGenerated: true,
                     generatedAt: new Date().toISOString()
                 }
@@ -205,6 +187,13 @@ export class ApplicationController {
         } catch (error) {
             throw new InternalServerErrorException(`Failed to regenerate ${environment} keys: ${error.message}`);
         }
+    }
+
+    @Get(':id/keys')
+    @Roles(['admin', 'user'])
+    @ApiOperation({ summary: 'Récupérer les clés d\'une application' })
+    async getApplicationKeys(@Param('id') id: string) {
+        return await this.applicationService.getApplicationKeys(id);
     }
 
     @Get(':id/credentials')

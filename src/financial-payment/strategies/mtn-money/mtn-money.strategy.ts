@@ -22,36 +22,37 @@ export class MtnMoneyStrategyPayment implements PaymentMethodStrategy {
         console.log('- API UUID:', this.configService.get<string>('MOMO_API_DEFAULT_UUID'));
     }
 
-    // Méthode pour obtenir un token d'accès avec retry et timeout
+    // Méthode corrigée pour obtenir le token avec gestion d'environnement
     private getToken(uuid: string): Promise<string> {
         return new Promise((resolve, reject) => {
             console.log("Getting MTN token with UUID:", uuid);
             
-            // Vérifier que les variables d'environnement nécessaires sont définies
             const apiPath = this.configService.get<string>("MOMO_API_PATH");
             const apiKey = this.configService.get<string>("MOMO_API_KEY");
             const primaryKey = this.configService.get<string>("MOMO_API_PRIMARY_KEY");
+            const environment = this.configService.get<string>("MOMO_API_MODE_ENV") || "sandbox";
             
-            if (!apiPath || !apiKey || !primaryKey) {
-                console.error("Missing environment variables:", {
+            if (!apiPath || !apiKey || !primaryKey || !uuid) {
+                console.error("Missing MTN configuration:", {
                     apiPath: !!apiPath,
                     apiKey: !!apiKey,
-                    primaryKey: !!primaryKey
+                    primaryKey: !!primaryKey,
+                    uuid: !!uuid
                 });
-                return reject(new Error("Missing required environment variables"));
+                return reject(new Error("Missing required MTN configuration"));
             }
             
-            // Créer les identifiants en Base64
-            const credentials = Buffer.from(`${uuid}:${apiKey}`).toString('base64');
+            // Endpoint différent selon l'environnement
+            const tokenEndpoint = environment === "production" 
+                ? `${apiPath}/collection/token/`
+                : `${apiPath}/collection/token/`;
             
-            // Ajouter un timeout pour éviter les blocages
-            const source = axios.CancelToken.source();
-            const timeout = setTimeout(() => {
-                source.cancel('Request timeout');
-            }, 30000); // 30 secondes de timeout
+            const credentials = Buffer.from(`${uuid}:${apiKey}`).toString("base64");
+            
+            console.log(`Using MTN ${environment} environment`);
             
             this.httpService.axiosRef.post(
-                `${apiPath}/collection/token/`,
+                tokenEndpoint,
                 {},
                 {
                     headers: {
@@ -59,13 +60,12 @@ export class MtnMoneyStrategyPayment implements PaymentMethodStrategy {
                         "Ocp-Apim-Subscription-Key": primaryKey,
                         "Content-Type": "application/json"
                     },
-                    cancelToken: source.token
+                    timeout: 30000
                 }
             )
             .then((response) => {
-                clearTimeout(timeout);
-                console.log("MTN token obtained successfully");
                 if (response.data && response.data.access_token) {
+                    console.log("MTN token obtained successfully");
                     resolve(response.data.access_token);
                 } else {
                     console.error("Invalid token response:", response.data);
@@ -73,9 +73,22 @@ export class MtnMoneyStrategyPayment implements PaymentMethodStrategy {
                 }
             })
             .catch((error) => {
-                clearTimeout(timeout);
-                console.error("Failed to get MTN token:", error?.response?.data || error.message);
-                reject(error);
+                console.error("MTN token error:", {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                    message: error.message
+                });
+                
+                // Gestion spécifique des erreurs de production
+                if (error.response?.status === 418) {
+                    reject(new Error("MTN API not accessible - Check production keys approval"));
+                } else if (error.response?.status === 401) {
+                    reject(new Error("MTN Authentication failed - Invalid credentials"));
+                } else if (error.response?.status === 403) {
+                    reject(new Error("MTN Access forbidden - Keys not approved for production"));
+                } else {
+                    reject(new Error(`MTN API error: ${error.message}`));
+                }
             });
         });
     }
@@ -153,50 +166,22 @@ export class MtnMoneyStrategyPayment implements PaymentMethodStrategy {
         return new Promise((resolve, reject) => {
             console.log("Starting MTN payment for transaction:", financialTransaction.ref);
             
-            // Validation des données d'entrée
-            if (!financialTransaction || !financialTransaction._id) {
-                console.error("Invalid transaction object");
+            // Validation renforcée
+            if (!this.validateTransaction(financialTransaction)) {
                 return resolve({ error: FinancialTransactionErrorType.UNKNOW_ERROR });
             }
             
-            if (!financialTransaction.phoneNumber) {
-                console.error("Missing phone number");
-                return resolve({ error: FinancialTransactionErrorType.INVALID_PHONE_NUMBER });
-            }
-            
-            if (!financialTransaction.amount || financialTransaction.amount <= 0) {
-                console.error("Invalid amount:", financialTransaction.amount);
-                return resolve({ error: FinancialTransactionErrorType.INVALID_AMOUNT_ERROR });
-            }
-            
-            // Vérifier que le numéro de téléphone est au bon format
             const phoneNumber = this.formatPhoneNumber(financialTransaction.phoneNumber);
-            console.log("Formatted phone number:", phoneNumber);
+            const currency = this.configService.get<string>("MOMO_API_CURRENCY") || "XAF";
+            const environment = this.configService.get<string>("MOMO_API_MODE_ENV") || "sandbox";
             
-            // Vérifier que l'UUID est défini
-            const uuid = this.configService.get<string>("MOMO_API_DEFAULT_UUID");
-            if (!uuid) {
-                console.error("MOMO_API_DEFAULT_UUID is not defined in environment variables");
-                return resolve({ error: FinancialTransactionErrorType.UNKNOW_ERROR });
-            }
+            console.log(`MTN Payment - Environment: ${environment}, Currency: ${currency}`);
             
-            console.log("Using UUID:", uuid);
-            
-            this.getToken(uuid)
+            this.getToken(this.configService.get<string>("MOMO_API_DEFAULT_UUID"))
             .then((token) => {
-                console.log("Token obtained successfully:", !!token);
-                
-                // Générer une référence unique pour le paiement
                 const paymentRef = financialTransaction.ref || uuidv4();
-                console.log("Payment reference:", paymentRef);
                 
-                // Obtenir la devise à utiliser (EUR pour le sandbox si XAF n'est pas supporté)
-                const configCurrency = this.configService.get<string>("MOMO_API_CURRENCY") || "EUR";
-                const currency = this.configService.get<string>("MOMO_API_MODE_ENV") === "sandbox" ? "EUR" : configCurrency;
-                console.log("Using currency:", currency);
-                
-                // Utiliser axiosRef au lieu de request pour éviter les problèmes avec RxJS
-                this.httpService.axiosRef.post(
+                return this.httpService.axiosRef.post(
                     `${this.configService.get<string>("MOMO_API_PATH")}/collection/v1_0/requesttopay`,
                     {
                         amount: financialTransaction.amount.toString(),
@@ -213,31 +198,88 @@ export class MtnMoneyStrategyPayment implements PaymentMethodStrategy {
                         headers: {
                             "Authorization": `Bearer ${token}`,
                             "X-Reference-Id": paymentRef,
-                            "X-Target-Environment": this.configService.get<string>("MOMO_API_MODE_ENV"),
+                            "X-Target-Environment": environment,
                             "Ocp-Apim-Subscription-Key": this.configService.get<string>("MOMO_API_PRIMARY_KEY"),
                             "Content-Type": "application/json"
-                        }
+                        },
+                        timeout: 45000 // Timeout plus long pour la production
                     }
-                )
-                .then((response) => {
-                    const result = { status: 'PENDING', ref: paymentRef };
-                    this.logTransaction('BUY', financialTransaction, result);
-                    resolve(result);
-                })
-                .catch((error) => {
-                    const errorResult = { error: FinancialTransactionErrorType.UNKNOW_ERROR };
-                    this.logTransaction('BUY-ERROR', financialTransaction, {
-                        error: errorResult,
-                        details: error?.response?.data || error.message
-                    });
-                    resolve(errorResult);
-                });
+                );
+            })
+            .then((response) => {
+                console.log("MTN payment request successful");
+                const result = { 
+                    status: 'PENDING', 
+                    ref: financialTransaction.ref,
+                    error: FinancialTransactionErrorType.NO_ERROR,
+                    token: financialTransaction.ref
+                };
+                this.logTransaction('BUY-SUCCESS', financialTransaction, result);
+                resolve(result);
             })
             .catch((error) => {
-                console.error("Failed to get MTN token:", error);
-                resolve({ error: FinancialTransactionErrorType.UNKNOW_ERROR });
+                console.error("MTN payment error:", {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                    message: error.message
+                });
+                
+                const errorResult = this.handlePaymentError(error);
+                this.logTransaction('BUY-ERROR', financialTransaction, {
+                    error: errorResult,
+                    details: error?.response?.data || error.message
+                });
+                resolve(errorResult);
             });
         });
+    }
+
+    private validateTransaction(transaction: FinancialTransaction): boolean {
+        if (!transaction || !transaction._id) {
+            console.error("Invalid transaction object");
+            return false;
+        }
+        
+        if (!transaction.phoneNumber) {
+            console.error("Missing phone number");
+            return false;
+        }
+        
+        if (!transaction.amount || transaction.amount <= 0) {
+            console.error("Invalid amount:", transaction.amount);
+            return false;
+        }
+        
+        return true;
+    }
+
+    private handlePaymentError(error: any): { error: FinancialTransactionErrorType } {
+        if (error.response?.status === 418) {
+            return { error: FinancialTransactionErrorType.UNKNOW_ERROR };
+        }
+        
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            return { error: FinancialTransactionErrorType.UNKNOW_ERROR };
+        }
+        
+        if (error.response?.status === 400) {
+            const errorData = error.response.data;
+            if (errorData?.message?.includes("PAYEE_NOT_FOUND")) {
+                return { error: FinancialTransactionErrorType.RECEIVER_NOT_FOUND_ERROR };
+            }
+            if (errorData?.message?.includes("INSUFFICIENT_FUNDS")) {
+                return { error: FinancialTransactionErrorType.INSUFFICIENT_AMOUNT_ERROR };
+            }
+            if (errorData?.message?.includes("INVALID_CURRENCY")) {
+                return { error: FinancialTransactionErrorType.UNKNOW_ERROR };
+            }
+        }
+        
+        if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            return { error: FinancialTransactionErrorType.TIMEOUT_PAYMENT };
+        }
+        
+        return { error: FinancialTransactionErrorType.UNKNOW_ERROR };
     }
 
     // Méthode pour vérifier le statut d'une transaction
