@@ -119,6 +119,12 @@ const scripts: ScriptInfo[] = [
     description: 'Extraire les clés d\'une application',
     command: 'npm run extract:app-keys',
     category: 'Applications'
+  },
+  {
+    name: 'generate-app-test-keys',
+    description: 'Générer de nouvelles clés de test pour une application',
+    command: 'npm run generate:app-test-keys',
+    category: 'Applications'
   }
 ];
 
