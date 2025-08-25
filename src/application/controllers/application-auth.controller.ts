@@ -3,7 +3,8 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBasicAuth, ApiHea
 import { AuthBasicGuard } from '../guards/auth-basic.guard';
 import { AuthJwtGuard } from '../guards/auth-jwt.guard';
 import { ApplicationAuthService } from '../services/application-auth.service';
-import { Public } from 'src/keycloak/keycloak.decorator';
+//import { Public } from 'src/keycloak/keycloak.decorator';
+import { Public } from 'nest-keycloak-connect';
 
 @ApiTags('Application Authentication')
 @Controller('application-auth')
@@ -27,7 +28,7 @@ export class ApplicationAuthController {
         **Example:**
         \`\`\`bash
         curl -X POST https://api.y-nkap.com/application-auth/login \\
-          -H "Authorization: Basic $(echo -n 'your-client-id:your-private-key' | base64)"
+        -H "Authorization: Basic $(echo -n 'your-client-id:your-private-key' | base64)"
         \`\`\`
         `
     })
