@@ -1,7 +1,7 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { KeycloakConnectModule, AuthGuard, RoleGuard } from 'nest-keycloak-connect';
+import { KeycloakConnectModule, RoleGuard } from 'nest-keycloak-connect';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApplicationModule } from './application/application.module';
@@ -18,9 +18,13 @@ import { ErrorLoggerInterceptor } from './logs/interceptors/error-logger.interce
 import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
+import { ApplicationAuthMiddleware } from './application/middleware/application-auth.middleware';
 import { UserModule } from './user/user.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ExecutionContext, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
 
 @Module({
   imports: [
@@ -92,16 +96,14 @@ import { DashboardModule } from './dashboard/dashboard.module';
   controllers: [AppController],
   providers: [
     AppService,
-    // Configurer les gardes globaux pour Keycloak
     {
       provide: APP_GUARD,
-      useClass: AuthGuard,
+      useClass: CustomKeycloakGuard,
     },
     {
       provide: APP_GUARD,
       useClass: RoleGuard,
     },
-    // Ajouter l'intercepteur de journalisation global
     {
       provide: APP_INTERCEPTOR,
       useClass: ActivityLoggerInterceptor,
@@ -110,8 +112,14 @@ import { DashboardModule } from './dashboard/dashboard.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // Appliquer le middleware d'auth application sur toutes les routes application-auth
+    consumer
+      .apply(ApplicationAuthMiddleware)
+      .forRoutes({ path: 'application-auth/*', method: RequestMethod.ALL });
+      
     consumer
       .apply(KeycloakDebugMiddleware)
-      .forRoutes('*'); // Appliquer à toutes les routes
+      .exclude('application-auth/(.*)')
+      .forRoutes('*');
   }
 }

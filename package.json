@@ -35,7 +35,8 @@
     "seed:transactions-simple": "ts-node -r tsconfig-paths/register src/scripts/seed-transactions-simple.ts",
     "test:payment-prod": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-production-payment.ts",
     "generate:app-test-keys": "ts-node -r tsconfig-paths/register src/scripts/generate-app-test-keys.ts",
-    "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts"
+    "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts",
+    "debug:auth": "ts-node -r tsconfig-paths/register src/scripts/debug-auth.ts"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^25.0.4",

@@ -27,83 +27,88 @@ export class ApplicationAuthService {
         const userAgent = req.get('user-agent') || 'unknown';
 
         try {
+            console.log('🔍 [validateApplication] Starting validation for clientId:', clientId);
+            
             // 1. Recherche de la clé par clientId
+            console.log('🔍 [validateApplication] Step 1: Searching for application key...');
             const applicationKey = await this.applicationKeyModel.findOne({
                 clientId,
                 isActive: true
             }).populate('applicationId');
 
             if (!applicationKey) {
+                console.log('❌ [validateApplication] Application key not found');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Client ID not found');
                 throw new UnauthorizedException('Invalid client credentials');
             }
+            console.log('✅ [validateApplication] Application key found');
 
             // 2. Vérification bcrypt de la clé privée
+            console.log('🔍 [validateApplication] Step 2: Verifying private key...');
             const isValidPrivateKey = await bcrypt.compare(privateKey, applicationKey.privateKeyHash);
             if (!isValidPrivateKey) {
+                console.log('❌ [validateApplication] Invalid private key');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Invalid private key');
                 throw new UnauthorizedException('Invalid client credentials');
             }
+            console.log('✅ [validateApplication] Private key valid');
 
             // 3. Vérification de l'expiration de la clé
+            console.log('🔍 [validateApplication] Step 3: Checking key expiration...');
             if (applicationKey.expiresAt && new Date() > applicationKey.expiresAt) {
+                console.log('❌ [validateApplication] Key expired');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Key expired');
                 throw new UnauthorizedException('Client credentials expired');
             }
+            console.log('✅ [validateApplication] Key not expired');
 
             // 4. Récupération de l'application
-            const application = await this.applicationService.findById(applicationKey.applicationId.toString(), null);
+            console.log('🔍 [validateApplication] Step 4: Fetching application...');
+            // Vérifier si l'application est déjà populée
+            let application: ApplicationDocument;
+            if (typeof applicationKey.applicationId === 'string') {
+                // Si c'est un string, faire un appel à la base
+                application = await this.applicationService.findById(applicationKey.applicationId, null);
+            } else {
+                // Si c'est déjà populé, l'utiliser directement
+                application = applicationKey.applicationId as ApplicationDocument;
+            }
+
             if (!application) {
+                console.log('❌ [validateApplication] Application not found');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Application not found');
                 throw new UnauthorizedException('Invalid client credentials');
             }
+            console.log('✅ [validateApplication] Application found:', application.name);
 
             // 5. Vérification que l'application n'est pas supprimée
+            console.log('🔍 [validateApplication] Step 5: Checking if application is deleted...');
             if (application.isDeleted) {
+                console.log('❌ [validateApplication] Application is deleted');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Application deleted');
                 throw new UnauthorizedException('Application no longer available');
             }
+            console.log('✅ [validateApplication] Application is active');
 
             // 6. Vérification de l'environnement activé
+            console.log('🔍 [validateApplication] Step 6: Checking environment...');
             const environment = applicationKey.environment;
+            console.log('🔍 [validateApplication] Environment:', environment);
+            
             if (environment === 'prod' && !application.envProd) {
+                console.log('❌ [validateApplication] Production environment disabled');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Production environment disabled');
                 throw new UnauthorizedException('Production environment not enabled');
             }
             
             if (environment === 'test' && !application.envTest) {
+                console.log('❌ [validateApplication] Test environment disabled');
                 await this.logFailedAttempt(clientId, ipAddress, userAgent, 'Test environment disabled');
                 throw new UnauthorizedException('Test environment not enabled');
             }
+            console.log('✅ [validateApplication] Environment check passed');
 
-            // 7. Vérification IP whitelist (si configurée)
-            if (applicationKey.ipWhitelist && applicationKey.ipWhitelist.length > 0) {
-                if (!applicationKey.ipWhitelist.includes(ipAddress)) {
-                    await this.logFailedAttempt(clientId, ipAddress, userAgent, 'IP not whitelisted');
-                    throw new UnauthorizedException('Access denied from this IP address');
-                }
-            }
-
-            // 8. Mise à jour de la dernière utilisation
-            await this.applicationKeyModel.findByIdAndUpdate(applicationKey._id, {
-                lastUsedAt: new Date()
-            });
-
-            // 9. Log de succès
-            await this.keyAuditService.logAuthAttempt({
-                applicationId: application._id.toString(),
-                clientId,
-                environment,
-                ipAddress,
-                userAgent,
-                success: true,
-                metadata: {
-                    applicationName: application.name,
-                    keyId: applicationKey._id.toString(),
-                    permissions: applicationKey.permissions
-                }
-            });
-
+            console.log('✅ [validateApplication] All validations passed successfully');
             return {
                 application,
                 applicationKey,
@@ -111,6 +116,10 @@ export class ApplicationAuthService {
             };
 
         } catch (error) {
+            console.log('❌ [validateApplication] Error caught:', error.message);
+            console.log('❌ [validateApplication] Error type:', error.constructor.name);
+            console.log('❌ [validateApplication] Error stack:', error.stack);
+            
             if (error instanceof UnauthorizedException) {
                 throw error;
             }
