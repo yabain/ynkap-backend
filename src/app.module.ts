@@ -1,7 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { KeycloakConnectModule, RoleGuard } from 'nest-keycloak-connect';
+import { KeycloakConnectModule, RoleGuard, AuthGuard } from 'nest-keycloak-connect';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApplicationModule } from './application/application.module';
@@ -24,7 +24,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
+// import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
 
 @Module({
   imports: [
@@ -70,14 +70,13 @@ import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
         realm: configService.get<string>('KEYCLOAK_SERVER_REALM'),
         clientId: configService.get<string>('KEYCLOAK_SERVER_CLIENTID'),
         secret: configService.get<string>('KEYCLOAK_SERVER_SECRET'),
-        // Ajouter des logs pour déboguer
         logLevels: ['verbose'],
-        // S'assurer que les tokens sont correctement validés
         bearerOnly: true,
-        // Vérifier si le token est valide à chaque requête
         verifyTokenAudience: false,
-        // Utiliser le cookie pour stocker le token
-        cookieKey: 'KEYCLOAK_JWT',
+        // Ajoutez ces paramètres pour la validation du token
+        'ssl-required': 'external',
+        'public-client': false,
+        'confidential-port': 0,
       }),
     }),
     ApplicationModule,
@@ -98,7 +97,7 @@ import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
     AppService,
     {
       provide: APP_GUARD,
-      useClass: CustomKeycloakGuard,
+      useClass: AuthGuard,
     },
     {
       provide: APP_GUARD,
@@ -112,14 +111,22 @@ import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Appliquer le middleware d'auth application sur toutes les routes application-auth
+    // Appliquer le middleware d'auth application UNIQUEMENT sur les 3 routes spécifiques
     consumer
       .apply(ApplicationAuthMiddleware)
-      .forRoutes({ path: 'application-auth/*', method: RequestMethod.ALL });
+      .forRoutes(
+        { path: 'application-auth/login', method: RequestMethod.POST },
+        { path: 'application-auth/verify', method: RequestMethod.GET },
+        { path: 'application-auth/refresh', method: RequestMethod.POST }
+      );
       
     consumer
       .apply(KeycloakDebugMiddleware)
-      .exclude('application-auth/(.*)')
+      .exclude(
+        { path: 'application-auth/login', method: RequestMethod.POST },
+        { path: 'application-auth/verify', method: RequestMethod.GET },
+        { path: 'application-auth/refresh', method: RequestMethod.POST }
+      )
       .forRoutes('*');
   }
 }

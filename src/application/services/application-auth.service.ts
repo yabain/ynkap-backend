@@ -1,3 +1,4 @@
+
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -108,7 +109,7 @@ export class ApplicationAuthService {
             }
             console.log('✅ [validateApplication] Environment check passed');
 
-            console.log('✅ [validateApplication] All validations passed successfully');
+            console.log('✅ [validateApplication] All validations passed successfully par la tete de M. WABA Ulrich');
             return {
                 application,
                 applicationKey,
