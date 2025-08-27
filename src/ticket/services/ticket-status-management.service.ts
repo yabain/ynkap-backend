@@ -67,8 +67,12 @@ export class TicketStatusManagementService {
     {
       from: TicketStatus.IN_PROGRESS,
       to: TicketStatus.CLOSE,
-      requiredRoles: ['manager'],
-      description: 'Close ticket without resolution (manager only)'
+      requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
+      conditions: (ticket, user) => {
+        // Only assigned solver or manager can close from in-progress
+        return ticket.assignTo === user.sub || user.roles.includes('manager');
+      },
+      description: 'Close ticket without resolution (requires rejection reason)'
     },
 
     // SOLVE transitions

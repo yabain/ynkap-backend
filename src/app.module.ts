@@ -9,11 +9,11 @@ import { WalletModule } from './wallet/wallet.module';
 import { TicketModule } from './ticket/ticket.module';
 import { GatewayModule } from './chat-gateway/gateway.module';
 import { MessageModule } from './message/message.module';
-// import { NotificationModule } from './notifications/notification.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { FinancialTransactionModule } from './financial-transaction/financial-transaction.module';
 import { FinancialPaymentModule } from './financial-payment/financial-payment.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { FAQModule } from './faq/faq.module';
 
 @Module({
   imports: [
@@ -27,7 +27,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     PaymentMethodsModule,
     FinancialTransactionModule,
     FinancialPaymentModule,
-    NotificationsModule
+    NotificationsModule,
+    FAQModule
   ],
   controllers: [AppController],
   providers: [
