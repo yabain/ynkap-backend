@@ -5,6 +5,7 @@ import { HttpModule } from "@nestjs/axios";
 import { Ticket, TicketSchema } from "./models/ticket.schema";
 import { TicketService } from "./services/ticket.services";
 import { TicketHistoryService } from "./services/ticket-history.service";
+import { TicketStatusManagementService } from "./services/ticket-status-management.service";
 import { KeycloakApiService } from "../keycloak/keycloak-api.service";
 import { TicketStatusHistory, TicketStatusHistorySchema } from "./models/ticket-modification-history.schema";
 import { SharedModule } from "src/shared/shared.module";
@@ -30,6 +31,6 @@ import { MessageModule } from "../message/message.module";
     ],
     controllers: [TicketController],
     exports: [TicketService],
-    providers: [TicketService, TicketHistoryService, KeycloakApiService]
+    providers: [TicketService, TicketHistoryService, TicketStatusManagementService, KeycloakApiService]
 })
 export class TicketModule{}

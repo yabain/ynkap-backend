@@ -14,6 +14,7 @@ import { CreateTicketDTO } from "../dtos/create-ticket.dto";
 import { EnhancedTicket, UserInfo } from "../interfaces/enhanced-ticket.interface";
 import { MessageService } from "../../message/services/message.service";
 import { NotificationType } from "../../notifications/dto/create-notification.dto";
+import { TicketStatusManagementService } from "./ticket-status-management.service";
 
 /**
  * Service for handling ticket-related operations
@@ -27,7 +28,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
         private keycloakApiService: KeycloakApiService,
         private ticketHistoryService: TicketHistoryService,
         private notificationService: NotificationService,
-        private messageService: MessageService
+        private messageService: MessageService,
+        private statusManagementService: TicketStatusManagementService
     ) {
         super(ticketModel, connection);
     }
@@ -416,26 +418,65 @@ export class TicketService extends DataBaseService<TicketDocument> {
             }
 
             const roles = req['user']['realm_access']['roles'];
-            if (!roles.includes('manager')) {
-                throw new ForbiddenException('Unauthorized user');
-            }
-
-            const allowedTransitions = {
-                [TicketStatus.OPEN]: [TicketStatus.IN_PROGRESS, TicketStatus.CLOSE],
-                [TicketStatus.IN_PROGRESS]: [TicketStatus.SOLVE, TicketStatus.CLOSE],
-                [TicketStatus.SOLVE]: [TicketStatus.CLOSE]
-            };
-
+            const userId = req['user']['sub'];
             const currentStatus = ticket.status;
             const newStatus = updateStatusDto.newStatus as TicketStatus;
 
-            if (!allowedTransitions[currentStatus] || !allowedTransitions[currentStatus].includes(newStatus)) {
-                throw new BadRequestException('Unauthorized status change');
+            // Create status change request
+            const statusChangeRequest = {
+                ticketId: id,
+                currentStatus,
+                newStatus,
+                reason: updateStatusDto.reason,
+                resolutionNotes: updateStatusDto.resolutionNotes,
+                rejectionReason: updateStatusDto.rejectionReason
+            };
+
+            // Validate status transition using the status management service
+            const validation = this.statusManagementService.validateStatusTransition(
+                statusChangeRequest,
+                roles,
+                ticket,
+                { sub: userId, roles }
+            );
+
+            if (!validation.isValid) {
+                throw new BadRequestException(validation.error);
             }
 
+            // Update ticket status
             ticket.status = newStatus;
+
+            // Update additional fields based on status
+            if (newStatus === TicketStatus.SOLVE && updateStatusDto.resolutionNotes) {
+                ticket.resolutionNotes = updateStatusDto.resolutionNotes;
+                ticket.resolutionDate = new Date();
+            }
+
+            if (newStatus === TicketStatus.CLOSE) {
+                if (currentStatus !== TicketStatus.SOLVE && updateStatusDto.rejectionReason) {
+                    ticket.rejectionReason = updateStatusDto.rejectionReason;
+                }
+            }
+
             await ticket.save({ session });
-            await this.ticketHistoryService.createHistory(ticket._id, currentStatus, newStatus, req['user']['sub']);
+
+            // Create history record
+            await this.ticketHistoryService.createHistory(
+                ticket._id,
+                currentStatus,
+                newStatus,
+                userId
+            );
+
+            // Log status change
+            this.statusManagementService.logStatusChange(
+                id,
+                currentStatus,
+                newStatus,
+                userId,
+                updateStatusDto.reason
+            );
 
             // Send status update notifications
             try {
@@ -457,6 +498,42 @@ export class TicketService extends DataBaseService<TicketDocument> {
         }).catch((error) => {
             throw error;
         });
+    }
+
+    /**
+     * Get user permissions for a specific ticket
+     * @param ticketId Ticket ID
+     * @param req Request object containing user information
+     * @returns User permissions for the ticket
+     */
+    async getTicketPermissions(ticketId: string, req: any): Promise<any> {
+        const ticket = await this.findOneByField({ _id: ticketId });
+        if (!ticket) {
+            throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+        }
+
+        const roles = req['user']['realm_access']['roles'];
+        const userId = req['user']['sub'];
+
+        const permissions = this.statusManagementService.getUserPermissions(
+            ticket,
+            roles,
+            userId
+        );
+
+        return {
+            ...permissions,
+            currentStatus: ticket.status,
+            ticketId: ticketId
+        };
+    }
+
+    /**
+     * Get status workflow information
+     * @returns Status workflow configuration
+     */
+    getStatusWorkflow(): any {
+        return this.statusManagementService.getStatusWorkflow();
     }
 
     /**

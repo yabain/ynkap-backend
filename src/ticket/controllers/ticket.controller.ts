@@ -154,4 +154,33 @@ export class TicketController {
     async getTicketsByStatus(@Req() req: Request, @Param("status") status: string) {
         return await this.ticketService.getTicketsByStatus(req, status);
     }
+
+    @Get(':id/permissions')
+    @CustomMessage('Ticket permissions retrieved successfully')
+    @ApiOperation({
+        summary: "Get user permissions for a specific ticket",
+        description: "Retrieve what actions the current user can perform on a ticket"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "User permissions for the ticket"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket not found"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "User not authenticated"})
+
+    async getTicketPermissions(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.getTicketPermissions(ticketId, req);
+    }
+
+    @Get('status/workflow')
+    @CustomMessage('Status workflow information retrieved successfully')
+    @ApiOperation({
+        summary: "Get status workflow configuration",
+        description: "Retrieve the complete status workflow with transitions and permissions"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Status workflow configuration"})
+
+    async getStatusWorkflow() {
+        return await this.ticketService.getStatusWorkflow();
+    }
 }

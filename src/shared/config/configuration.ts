@@ -14,6 +14,21 @@ export default () => ({
     SMTP_SECURE: process.env.SMTP_SECURE === 'true',
     SMTP_USER: process.env.SMTP_USER,
     SMTP_PASS: process.env.SMTP_PASS,
+
+    // Google Cloud Storage Configuration
+    GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
+    GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,
+    GCS_KEY_FILENAME: process.env.GCS_KEY_FILENAME,
+    GCS_PUBLIC_URL: process.env.GCS_PUBLIC_URL || 'https://storage.googleapis.com',
+
+    // File Upload Configuration
+    MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE, 10) || 52428800, // 50MB
+    MAX_FILES_PER_UPLOAD: parseInt(process.env.MAX_FILES_PER_UPLOAD, 10) || 10,
+    TEMP_DIR: process.env.TEMP_DIR || './uploads/temp',
+
+    // File Validation
+    CHECK_FILE_SIGNATURE: process.env.CHECK_FILE_SIGNATURE === 'true',
+    SCAN_FOR_VIRUSES: process.env.SCAN_FOR_VIRUSES === 'true',
     SMTP_FROM_EMAIL: process.env.SMTP_FROM_EMAIL,
     SMTP_TEST_EMAIL: process.env.SMTP_TEST_EMAIL,
     FRONTEND_URL: process.env.FRONTEND_URL,
