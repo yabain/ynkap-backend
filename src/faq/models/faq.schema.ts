@@ -51,6 +51,9 @@ export class FAQ extends Document {
     @Prop()
     updatedBy: string;
 
+    @Prop({ type: [String], default: [] })
+    viewedBy: string[];
+
 }
 
 export const FAQSchema = SchemaFactory.createForClass(FAQ);

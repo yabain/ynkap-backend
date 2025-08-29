@@ -1,6 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus,UseGuards,Logger} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery,ApiBearerAuth } from '@nestjs/swagger';
-import { FAQService, PaginatedFAQResult, FAQSuggestion } from '../services/faq.service';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, UseGuards, Logger, Req, ForbiddenException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { AuthenticatedUser } from 'nest-keycloak-connect';
+import { Request } from 'express';
+import { FAQService } from '../services/faq.service';
+import { PaginatedFAQResult, FAQSuggestion, BatchOperationResponse } from '../interfaces/faq.interfaces';
 import { CreateFAQDTO } from '../dtos/create-faq.dto';
 import { UpdateFAQDTO } from '../dtos/update-faq.dto';
 import { SearchFAQDTO, SuggestFAQDTO } from '../dtos/search-faq.dto';
@@ -14,22 +17,50 @@ export class FAQController {
     constructor(private readonly faqService: FAQService) {}
 
     @Post()
-    @ApiOperation({ 
+    @ApiOperation({
         summary: 'Create a new FAQ',
-        description: 'Create a new frequently asked question with answer and tags'
+        description: 'Create a new frequently asked question with answer and tags. Requires solver, manager, or admin role.'
     })
-    @ApiResponse({ 
-        status: HttpStatus.CREATED, 
+    @ApiBearerAuth()
+    @ApiResponse({
+        status: HttpStatus.CREATED,
         description: 'FAQ created successfully',
         type: FAQ
     })
-    @ApiResponse({ 
-        status: HttpStatus.BAD_REQUEST, 
-        description: 'Invalid input data' 
+    @ApiResponse({
+        status: HttpStatus.BAD_REQUEST,
+        description: 'Invalid input data'
     })
-    async create(@Body() createFAQDto: CreateFAQDTO): Promise<FAQ> {
-        this.logger.log(`Creating new FAQ: ${createFAQDto.question}`);
-        return await this.faqService.create(createFAQDto);
+    @ApiResponse({
+        status: HttpStatus.UNAUTHORIZED,
+        description: 'Authentication required'
+    })
+    @ApiResponse({
+        status: HttpStatus.FORBIDDEN,
+        description: 'solver, manager, or admin role required'
+    })
+    async create(
+        @Body() createFAQDto: CreateFAQDTO,
+        @AuthenticatedUser() user: any,
+        @Req() req: Request
+    ): Promise<FAQ> {
+        // Check role access manually like ticket service does
+        const roles = req['user']['realm_access']['roles'];
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
+            role.includes('admin')
+        );
+        if (!isSolver) {
+            throw new ForbiddenException('solver, manager, or admin role required');
+        }
+
+        this.logger.log(`Creating new FAQ: ${createFAQDto.question} by user: ${user?.preferred_username || 'unknown'}`);
+        this.logger.log(`FAQ Data received:`, JSON.stringify(createFAQDto, null, 2));
+        this.logger.log(`User roles:`, JSON.stringify(roles, null, 2));
+        
+        const userId = req['user']['sub'];
+        return await this.faqService.create(createFAQDto, userId);
     }
 
     @Get()
@@ -51,7 +82,9 @@ export class FAQController {
         @Query('tags') tags?: string,
         @Query('isActive') isActive?: boolean,
         @Query('page') page?: number,
-        @Query('limit') limit?: number
+        @Query('limit') limit?: number,
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
     ): Promise<PaginatedFAQResult> {
         const searchDto: SearchFAQDTO = {
             query,
@@ -76,8 +109,12 @@ export class FAQController {
         description: 'Popular FAQs retrieved successfully',
         type: [FAQ]
     })
-    async findPopular(@Query('limit') limit?: number): Promise<FAQ[]> {
-        this.logger.log(`Getting popular FAQs with limit: ${limit || 10}`);
+    async findPopular(
+        @Query('limit') limit?: number,
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
+    ): Promise<FAQ[]> {
+        this.logger.log(`Getting popular FAQs with limit: ${limit || 10} for user: ${user?.preferred_username || 'unknown'}`);
         return await this.faqService.findPopular(limit);
     }
 
@@ -90,7 +127,10 @@ export class FAQController {
         status: HttpStatus.OK, 
         description: 'FAQ statistics retrieved successfully'
     })
-    async getStatistics(): Promise<{
+    async getStatistics(
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
+    ): Promise<{
         totalFAQs: number;
         activeFAQs: number;
         inactiveFAQs: number;
@@ -98,7 +138,7 @@ export class FAQController {
         averageViews: number;
         topTags: { tag: string; count: number }[];
     }> {
-        this.logger.log('Getting FAQ statistics');
+        this.logger.log(`Getting FAQ statistics for user: ${user?.preferred_username || 'unknown'}`);
         return await this.faqService.getStatistics();
     }
 
@@ -111,8 +151,12 @@ export class FAQController {
         status: HttpStatus.OK, 
         description: 'FAQ suggestions retrieved successfully'
     })
-    async suggestFAQs(@Body() suggestDto: SuggestFAQDTO): Promise<FAQSuggestion[]> {
-        this.logger.log(`Getting FAQ suggestions for: ${JSON.stringify(suggestDto)}`);
+    async suggestFAQs(
+        @Body() suggestDto: SuggestFAQDTO,
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
+    ): Promise<FAQSuggestion[]> {
+        this.logger.log(`Getting FAQ suggestions for: ${JSON.stringify(suggestDto)} by user: ${user?.preferred_username || 'unknown'}`);
         return await this.faqService.suggestFAQs(suggestDto);
     }
 
@@ -131,54 +175,111 @@ export class FAQController {
         status: HttpStatus.NOT_FOUND, 
         description: 'FAQ not found' 
     })
-    async findById(@Param('id') id: string): Promise<FAQ> {
-        this.logger.log(`Getting FAQ by ID: ${id}`);
-        return await this.faqService.findById(id);
+    async findById(
+        @Param('id') id: string,
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
+    ): Promise<FAQ> {
+        const userId = req && req['user'] ? req['user']['sub'] : undefined;
+        this.logger.log(`=== DEBUG FAQ VIEW ===`);
+        this.logger.log(`FAQ ID: ${id}`);
+        this.logger.log(`User ID extracted: ${userId}`);
+        this.logger.log(`User object:`, JSON.stringify(user, null, 2));
+        this.logger.log(`Request user:`, JSON.stringify(req?.['user'], null, 2));
+        this.logger.log(`==================`);
+        
+        return await this.faqService.findById(id, userId);
     }
 
     @Put(':id')
-    @ApiOperation({ 
+    @ApiOperation({
         summary: 'Update FAQ',
-        description: 'Update an existing FAQ by ID'
+        description: 'Update an existing FAQ by ID. Requires solver, manager, or admin role.'
     })
+    @ApiBearerAuth()
     @ApiParam({ name: 'id', description: 'FAQ ID' })
-    @ApiResponse({ 
-        status: HttpStatus.OK, 
+    @ApiResponse({
+        status: HttpStatus.OK,
         description: 'FAQ updated successfully',
         type: FAQ
     })
-    @ApiResponse({ 
-        status: HttpStatus.NOT_FOUND, 
-        description: 'FAQ not found' 
+    @ApiResponse({
+        status: HttpStatus.NOT_FOUND,
+        description: 'FAQ not found'
     })
-    @ApiResponse({ 
-        status: HttpStatus.BAD_REQUEST, 
-        description: 'Invalid input data' 
+    @ApiResponse({
+        status: HttpStatus.BAD_REQUEST,
+        description: 'Invalid input data'
+    })
+    @ApiResponse({
+        status: HttpStatus.UNAUTHORIZED,
+        description: 'Authentication required'
+    })
+    @ApiResponse({
+        status: HttpStatus.FORBIDDEN,
+        description: 'solver, manager, or admin role required'
     })
     async update(
-        @Param('id') id: string, 
-        @Body() updateFAQDto: UpdateFAQDTO
+        @Param('id') id: string,
+        @Body() updateFAQDto: UpdateFAQDTO,
+        @AuthenticatedUser() user: any,
+        @Req() req: Request
     ): Promise<FAQ> {
-        this.logger.log(`Updating FAQ with ID: ${id}`);
+        // Check role access manually
+        const roles = req['user']['realm_access']['roles'];
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
+            role.includes('admin')
+        );
+        if (!isSolver) {
+            throw new ForbiddenException('solver, manager, or admin role required');
+        }
+
+        this.logger.log(`Updating FAQ with ID: ${id} by user: ${user?.preferred_username || 'unknown'}`);
         return await this.faqService.update(id, updateFAQDto);
     }
 
     @Delete(':id')
-    @ApiOperation({ 
+    @ApiOperation({
         summary: 'Delete FAQ',
-        description: 'Delete an FAQ by ID'
+        description: 'Delete an FAQ by ID. Requires solver, manager, or admin role.'
     })
+    @ApiBearerAuth()
     @ApiParam({ name: 'id', description: 'FAQ ID' })
-    @ApiResponse({ 
-        status: HttpStatus.OK, 
-        description: 'FAQ deleted successfully' 
+    @ApiResponse({
+        status: HttpStatus.OK,
+        description: 'FAQ deleted successfully'
     })
-    @ApiResponse({ 
-        status: HttpStatus.NOT_FOUND, 
-        description: 'FAQ not found' 
+    @ApiResponse({
+        status: HttpStatus.NOT_FOUND,
+        description: 'FAQ not found'
     })
-    async delete(@Param('id') id: string): Promise<{ message: string }> {
-        this.logger.log(`Deleting FAQ with ID: ${id}`);
+    @ApiResponse({
+        status: HttpStatus.UNAUTHORIZED,
+        description: 'Authentication required'
+    })
+    @ApiResponse({
+        status: HttpStatus.FORBIDDEN,
+        description: 'solver, manager, or admin role required'
+    })
+    async delete(
+        @Param('id') id: string,
+        @AuthenticatedUser() user: any,
+        @Req() req: Request
+    ): Promise<{ message: string }> {
+        // Check role access manually
+        const roles = req['user']['realm_access']['roles'];
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
+            role.includes('admin')
+        );
+        if (!isSolver) {
+            throw new ForbiddenException('solver, manager, or admin role required');
+        }
+
+        this.logger.log(`Deleting FAQ with ID: ${id} by user: ${user?.preferred_username || 'unknown'}`);
         await this.faqService.delete(id);
         return { message: 'FAQ deleted successfully' };
     }
@@ -204,7 +305,9 @@ export class FAQController {
         @Query('tags') tags?: string,
         @Query('active') isActive?: boolean,
         @Query('page') page?: number,
-        @Query('size') limit?: number
+        @Query('size') limit?: number,
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
     ): Promise<PaginatedFAQResult> {
         const searchDto: SearchFAQDTO = {
             query,
@@ -228,23 +331,51 @@ export class FAQController {
         status: HttpStatus.OK, 
         description: 'Popular tags retrieved successfully'
     })
-    async getPopularTags(@Query('limit') limit?: number): Promise<{ tag: string; count: number }[]> {
-        this.logger.log(`Getting popular tags with limit: ${limit || 20}`);
+    async getPopularTags(
+        @Query('limit') limit?: number,
+        @AuthenticatedUser() user?: any,
+        @Req() req?: Request
+    ): Promise<{ tag: string; count: number }[]> {
+        this.logger.log(`Getting popular tags with limit: ${limit || 20} for user: ${user?.preferred_username || 'unknown'}`);
         const stats = await this.faqService.getStatistics();
         return stats.topTags.slice(0, limit || 20);
     }
 
     @Post('batch/activate')
-    @ApiOperation({ 
+    @ApiOperation({
         summary: 'Batch activate FAQs',
-        description: 'Activate multiple FAQs at once'
+        description: 'Activate multiple FAQs at once. Requires solver, manager, or admin role.'
     })
-    @ApiResponse({ 
-        status: HttpStatus.OK, 
+    @ApiBearerAuth()
+    @ApiResponse({
+        status: HttpStatus.OK,
         description: 'FAQs activated successfully'
     })
-    async batchActivate(@Body('ids') ids: string[]): Promise<{ message: string; updated: number }> {
-        this.logger.log(`Batch activating FAQs: ${ids.join(', ')}`);
+    @ApiResponse({
+        status: HttpStatus.UNAUTHORIZED,
+        description: 'Authentication required'
+    })
+    @ApiResponse({
+        status: HttpStatus.FORBIDDEN,
+        description: 'solver, manager, or admin role required'
+    })
+    async batchActivate(
+        @Body('ids') ids: string[],
+        @AuthenticatedUser() user: any,
+        @Req() req: Request
+    ): Promise<BatchOperationResponse> {
+        // Check role access manually
+        const roles = req['user']['realm_access']['roles'];
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
+            role.includes('admin')
+        );
+        if (!isSolver) {
+            throw new ForbiddenException('solver, manager, or admin role required');
+        }
+
+        this.logger.log(`Batch activating FAQs: ${ids.join(', ')} by user: ${user?.preferred_username || 'unknown'}`);
         let updated = 0;
         
         for (const id of ids) {
@@ -256,23 +387,47 @@ export class FAQController {
             }
         }
 
-        return { 
+        return {
             message: `${updated} FAQs activated successfully`,
             updated
         };
     }
 
     @Post('batch/deactivate')
-    @ApiOperation({ 
+    @ApiOperation({
         summary: 'Batch deactivate FAQs',
-        description: 'Deactivate multiple FAQs at once'
+        description: 'Deactivate multiple FAQs at once. Requires solver, manager, or admin role.'
     })
-    @ApiResponse({ 
-        status: HttpStatus.OK, 
+    @ApiBearerAuth()
+    @ApiResponse({
+        status: HttpStatus.OK,
         description: 'FAQs deactivated successfully'
     })
-    async batchDeactivate(@Body('ids') ids: string[]): Promise<{ message: string; updated: number }> {
-        this.logger.log(`Batch deactivating FAQs: ${ids.join(', ')}`);
+    @ApiResponse({
+        status: HttpStatus.UNAUTHORIZED,
+        description: 'Authentication required'
+    })
+    @ApiResponse({
+        status: HttpStatus.FORBIDDEN,
+        description: 'solver, manager, or admin role required'
+    })
+    async batchDeactivate(
+        @Body('ids') ids: string[],
+        @AuthenticatedUser() user: any,
+        @Req() req: Request
+    ): Promise<BatchOperationResponse> {
+        // Check role access manually
+        const roles = req['user']['realm_access']['roles'];
+        const isSolver = roles.some(role =>
+            role.includes('solver') ||
+            role.includes('manager') ||
+            role.includes('admin')
+        );
+        if (!isSolver) {
+            throw new ForbiddenException('solver, manager, or admin role required');
+        }
+
+        this.logger.log(`Batch deactivating FAQs: ${ids.join(', ')} by user: ${user?.preferred_username || 'unknown'}`);
         let updated = 0;
         
         for (const id of ids) {
@@ -284,7 +439,7 @@ export class FAQController {
             }
         }
 
-        return { 
+        return {
             message: `${updated} FAQs deactivated successfully`,
             updated
         };

@@ -5,22 +5,7 @@ import { FAQ, FAQDocument } from '../models/faq.schema';
 import { CreateFAQDTO } from '../dtos/create-faq.dto';
 import { UpdateFAQDTO } from '../dtos/update-faq.dto';
 import { SearchFAQDTO, SuggestFAQDTO } from '../dtos/search-faq.dto';
-
-export interface PaginatedFAQResult {
-    items: FAQ[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-}
-
-export interface FAQSuggestion {
-    faq: FAQ;
-    relevanceScore: number;
-    matchedFields: string[];
-}
+import { PaginatedFAQResult, FAQSuggestion, FAQStatistics } from '../interfaces/faq.interfaces';
 
 @Injectable()
 export class FAQService {
@@ -33,12 +18,15 @@ export class FAQService {
     /**
      * Create a new FAQ
      */
-    async create(createFAQDto: CreateFAQDTO): Promise<FAQ> {
+    async create(createFAQDto: CreateFAQDTO, createdBy: string): Promise<FAQ> {
         try {
-            const faq = new this.faqModel(createFAQDto);
+            const faq = new this.faqModel({
+                ...createFAQDto,
+                createdBy
+            });
             const savedFAQ = await faq.save();
             
-            this.logger.log(`FAQ created with ID: ${savedFAQ._id}`);
+            this.logger.log(`FAQ created with ID: ${savedFAQ._id} by user: ${createdBy}`);
             return savedFAQ;
         } catch (error) {
             this.logger.error(`Failed to create FAQ: ${error.message}`, error.stack);
@@ -104,9 +92,9 @@ export class FAQService {
     }
 
     /**
-     * Find FAQ by ID
+     * Find FAQ by ID with optional view count increment for unique users
      */
-    async findById(id: string): Promise<FAQ> {
+    async findById(id: string, userId?: string): Promise<FAQ> {
         try {
             const faq = await this.faqModel.findById(id).exec();
             
@@ -114,8 +102,50 @@ export class FAQService {
                 throw new NotFoundException(`FAQ with ID ${id} not found`);
             }
 
-            // Increment view count
-            await this.faqModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } }).exec();
+            this.logger.log(`=== FAQ SERVICE DEBUG ===`);
+            this.logger.log(`FAQ ID: ${id}`);
+            this.logger.log(`User ID: ${userId}`);
+            this.logger.log(`Current view count: ${faq.viewCount}`);
+            this.logger.log(`ViewedBy array: ${JSON.stringify(faq.viewedBy || [])}`);
+            this.logger.log(`ViewedBy array type: ${typeof faq.viewedBy}`);
+            this.logger.log(`ViewedBy is array: ${Array.isArray(faq.viewedBy)}`);
+
+            // Initialize viewedBy if it doesn't exist (for existing FAQs)
+            if (!faq.viewedBy) {
+                this.logger.log(`ViewedBy field missing, initializing...`);
+                faq.viewedBy = [];
+            }
+
+            const hasUserViewed = faq.viewedBy.includes(userId);
+            this.logger.log(`User ${userId} has viewed before: ${hasUserViewed}`);
+
+            // Increment view count only if user hasn't viewed this FAQ before
+            if (userId && !hasUserViewed) {
+                this.logger.log(`Incrementing view count for new user...`);
+                
+                const updateResult = await this.faqModel.findByIdAndUpdate(
+                    id,
+                    {
+                        $inc: { viewCount: 1 },
+                        $addToSet: { viewedBy: userId }
+                    },
+                    { new: true } // Return updated document
+                ).exec();
+                
+                this.logger.log(`Update result:`, JSON.stringify(updateResult, null, 2));
+                
+                // Update the returned faq object with incremented count
+                faq.viewCount = updateResult.viewCount;
+                faq.viewedBy = updateResult.viewedBy;
+                
+                this.logger.log(`FAQ ${id} NEW VIEW by user ${userId} (view count: ${faq.viewCount})`);
+            } else if (userId) {
+                this.logger.log(`FAQ ${id} ALREADY VIEWED by user ${userId}, count stays ${faq.viewCount}`);
+            } else {
+                this.logger.log(`No user ID provided, no view tracking`);
+            }
+            
+            this.logger.log(`=== END FAQ SERVICE DEBUG ===`);
             
             return faq;
         } catch (error) {
@@ -342,14 +372,7 @@ export class FAQService {
     /**
      * Get FAQ statistics
      */
-    async getStatistics(): Promise<{
-        totalFAQs: number;
-        activeFAQs: number;
-        inactiveFAQs: number;
-        totalViews: number;
-        averageViews: number;
-        topTags: { tag: string; count: number }[];
-    }> {
+    async getStatistics(): Promise<FAQStatistics> {
         try {
             const [
                 totalFAQs,
