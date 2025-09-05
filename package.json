@@ -36,7 +36,8 @@
     "test:payment-prod": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-production-payment.ts",
     "generate:app-test-keys": "ts-node -r tsconfig-paths/register src/scripts/generate-app-test-keys.ts",
     "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts",
-    "debug:auth": "ts-node -r tsconfig-paths/register src/scripts/debug-auth.ts"
+    "debug:auth": "ts-node -r tsconfig-paths/register src/scripts/debug-auth.ts",
+    "test:orange-prod": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-orange-money-prod.ts"
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "^25.0.4",
