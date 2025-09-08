@@ -37,7 +37,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Y-Nkap API')
     .setDescription('API documentation for Y-Nkap')
-    .setVersion('1.0')
+    .setVersion('2.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);

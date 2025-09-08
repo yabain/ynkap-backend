@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UseGuards, Req, HttpStatus, Get, Param, ParseUUIDPipe, UseInterceptors, NotFoundException } from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { Request } from "express";
 import { AuthJwtGuard as AppAuthJwtGuard } from "src/application/guards"
 import { CreateFinancialTransactionDTO } from "../dtos"
@@ -7,14 +8,13 @@ import { OrangeMoneyUpdateFinancialTransactionStatus } from "../dtos/orange-mone
 import { MtnMoneyUpdateFinancialTransactionStatus } from "../dtos/mtn-money-update-financial-transaction.dto";
 import { Public } from "nest-keycloak-connect";
 import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CustomMessage } from "src/shared/decorators/custom-message.decorator";
 import { FinancialTransactionState } from "../enum";
 import { FinancialTransactionService } from "../services/financial-transaction.service";
 import { FinancialPaymentService } from "src/financial-payment/services";
 import { PaymentStrategyType } from "src/financial-payment/enum";
 import { LogTransaction } from '../../logs/interceptors/transaction-logger.interceptor';
-
+@Public()
 @Controller("payment")
 @ApiTags("Payment")
 @UseInterceptors(TransformResponeInterceptor)
@@ -25,7 +25,7 @@ export class PaymentController {
         private financialPaymentService: FinancialPaymentService
     ) {}
 
-    @ApiOperation({
+@ApiOperation({
         summary: "Initiate a new transaction payment",
         description: "This method initiates a new payment transaction with the specified operator"
     })
@@ -84,33 +84,38 @@ export class PaymentController {
             "timestamp": "2024-11-29T09:38:06.439Z"
         }
     })
-    // @UseGuards(AppAuthJwtGuard)
-    @Post("pay")    
-    @LogTransaction()
-    async makePayment(@Req() request:Request, @Body() createFinancialTransactionDTO:CreateFinancialTransactionDTO)
+
+     // @UseGuards(AppAuthJwtGuard)
+@Post("pay")
+@Public()
+@ApiOperation({
+    summary: "Initiate a new transaction payment",
+    description: "Create and initiate a new payment transaction"
+})
+@ApiResponse({status: HttpStatus.OK, description: "Payment initiated successfully"})
+@ApiBody({ type: CreateFinancialTransactionDTO })
+@LogTransaction()
+async makePayment(@Req() request:Request, @Body() createFinancialTransactionDTO:CreateFinancialTransactionDTO)
     {
         return await this.paymentService.makePayment(createFinancialTransactionDTO)     
     }
 
-    @Post("orange-money-notify-payment")    
-    async orangeMoneyNotifyPayment(@Req() request:Request, @Body() orangeMoneyUpdateFinancialTransactionStatus)
+
+    @Post("orange-money-notify-payment")
+    @Public()
+    @ApiOperation({
+        summary: "Orange Money payment notification",
+        description: "Endpoint for Orange Money to notify about payment status changes"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Notification processed successfully"})
+    @ApiBody({ type: OrangeMoneyUpdateFinancialTransactionStatus })
+    async orangeMoneyNotifyPayment(@Req() request:Request, @Body() orangeMoneyUpdateFinancialTransactionStatus: OrangeMoneyUpdateFinancialTransactionStatus)
     {
         //OrangeMoneyUpdateFinancialTransactionStatus
         return await this.paymentService.updatePayementStatus(orangeMoneyUpdateFinancialTransactionStatus.payToken,orangeMoneyUpdateFinancialTransactionStatus.status)      
     }
 
-    @Post("mtn-money-notify-payment")    
-    @Public()
-    @ApiOperation({
-        summary: "MTN Money payment notification",
-        description: "Endpoint for MTN Money to notify about payment status changes"
-    })
-    @ApiResponse({status: HttpStatus.OK, description: "Notification processed successfully"})
-    async mtnMoneyNotifyPayment(@Req() request:Request, @Body() mtnMoneyUpdateStatus) {
-        return await this.paymentService.updateMtnPaymentStatus(mtnMoneyUpdateStatus.referenceId, mtnMoneyUpdateStatus.status);
-    }
-
-
+    
     @ApiOperation({
         summary: "Get payment-transaction status",
         description: "This method is used to check the status of the payment transaction. "
@@ -172,7 +177,26 @@ export class PaymentController {
         }
     })
     // @UseGuards(AppAuthJwtGuard)
-    @Get("check/:ref")    
+    @Post("mtn-money-notify-payment")    
+    @Public()
+    @ApiOperation({
+        summary: "MTN Money payment notification",
+        description: "Endpoint for MTN Money to notify about payment status changes"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Notification processed successfully"})
+    async mtnMoneyNotifyPayment(@Req() request:Request, @Body() mtnMoneyUpdateStatus) {
+        return await this.paymentService.updateMtnPaymentStatus(mtnMoneyUpdateStatus.referenceId, mtnMoneyUpdateStatus.status);
+    }
+
+
+    @Get("check/:ref")
+    @Public() 
+    @ApiOperation({
+        summary: "Get payment-transaction status",
+        description: "Check the status of a payment transaction using its reference"
+    })
+    @ApiParam({ name: 'ref', description: 'Transaction reference' })
+    @ApiResponse({status: HttpStatus.OK, description: "Transaction status retrieved successfully"})
     async checkPayment(@Req() request:Request, @Param("ref") ref:string)
     {
         return await this.paymentService.checkPayment(ref)  

@@ -229,4 +229,26 @@ export class ApplicationService extends DataBaseService<ApplicationDocument> {
             expiresAt: key.expiresAt
         }));
     }
+
+    async getApplicationsByUserId(userId: string): Promise<any[]> {
+        console.log('Service: Récupération des applications pour l\'utilisateur:', userId);
+        
+        try {
+            const applications = await this.findByField({ user: userId });
+            console.log(`${applications.length} applications trouvées pour l'utilisateur ${userId}`);
+            
+            const applicationIds = applications.map(app => app._id.toString());
+            const walletAmounts = await this.walletService.getAmounts(applicationIds);
+            
+            const applicationsWithWallets = applications.map(app => ({
+                ...app.toObject(),
+                walletAmount: walletAmounts.get(app._id.toString()) || 0
+            }));
+            
+            return applicationsWithWallets;
+        } catch (error) {
+            console.error('Erreur lors de la récupération des applications:', error);
+            throw error;
+        }
+    }
 }

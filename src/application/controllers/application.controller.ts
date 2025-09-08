@@ -470,4 +470,18 @@ export class ApplicationController {
         data: status
       };
     }
+
+    @Get('user/:userId')
+    @CustomMessage('Applications successfully retrieved for user')
+    @ApiOperation({
+        summary: "Get all applications for a specific user",
+        description: "This method returns applications for a specific user ID"
+    })
+    @ApiParam({ name: 'userId', description: 'User ID', example: "user-123"})
+    @ApiResponse({status: HttpStatus.OK, description: "List of applications for the user"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "No applications found for this user"})
+    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
+    async getApplicationsByUserId(@Param('userId') userId: string) {
+        return await this.applicationService.getApplicationsByUserId(userId);
+    }
 }

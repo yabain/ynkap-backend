@@ -11,6 +11,7 @@ import { ApplicationModule } from 'src/application/application.module';
 import { WalletModule } from 'src/wallet/wallet.module';
 import { ConfigModule } from '@nestjs/config';
 import { LogsModule } from 'src/logs/logs.module';
+import { PaymentController } from './controllers/payment.controller'; 
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { LogsModule } from 'src/logs/logs.module';
     forwardRef(() => WalletModule),
     forwardRef(() => LogsModule),
   ],
-  controllers: [MtnTestController, PaymentHistoryController],
+  controllers: [MtnTestController, PaymentHistoryController , PaymentController ],
   providers: [FinancialTransactionService, PaymentService],
   exports: [FinancialTransactionService, PaymentService],
 })
