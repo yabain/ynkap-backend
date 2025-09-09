@@ -171,7 +171,7 @@ export class MtnMoneyStrategyPayment implements PaymentMethodStrategy {
                 return resolve({ error: FinancialTransactionErrorType.UNKNOW_ERROR });
             }
             
-            const phoneNumber = this.formatPhoneNumber(financialTransaction.phoneNumber);
+          const phoneNumber = this.formatPhoneNumber(financialTransaction.phoneNumber);
             const currency = this.configService.get<string>("MOMO_API_CURRENCY") || "XAF";
             const environment = this.configService.get<string>("MOMO_API_MODE_ENV") || "sandbox";
             

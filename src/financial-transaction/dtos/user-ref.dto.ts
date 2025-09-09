@@ -6,7 +6,7 @@ export class UserRefDTO
     
     @ApiProperty({
         description: "Full name of person initiating payment claim",
-        example: "Cédric Nguendap",
+        example: "Ulrich Waba",
         required:true
     })
     @IsString()
@@ -14,7 +14,7 @@ export class UserRefDTO
 
     @ApiProperty({
         description: "Account number of the person initiating payment claim",
-        example: "698295368",
+        example: "659396163",
         required:true
     })
     @IsString()

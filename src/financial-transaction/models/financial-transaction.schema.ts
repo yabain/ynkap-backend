@@ -9,6 +9,14 @@ import { UtilsFunc } from "../utils/utils-func";
 
 export type FinancialTransactionDocument =  HydratedDocument<FinancialTransaction>;
 
+export interface FinancialTransaction {
+    _id: any;
+    ref: string;
+    amount: number;
+    phoneNumber: string;      // Unification MTN/Orange
+    description?: string;     // Unification MTN/Orange
+    // ...autres propriétés existantes...
+}
 
 @Schema({
     toObject: {
@@ -71,13 +79,13 @@ export class FinancialTransaction extends Document
     wallet:Wallet;
 
     @Prop({default:Date.now(),required:true})
-    createdAt:Date;
+    createdAt:Date
 
-    @Prop()
+    @Prop({required:true, default: ""})           // Ajout pour MTN/Orange
     phoneNumber: string;
 
-    @Prop()
-    description: string;
+    @Prop({default: ""})                          // Ajout pour MTN/Orange
+    description?: string;
 }
 
 export const FinancialTransactionSchema = SchemaFactory.createForClass(FinancialTransaction)
