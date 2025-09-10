@@ -27,7 +27,7 @@ export class ActivityLoggerInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const method = request.method;
     const url = request.url;
-    const user = request.user?.sub || 'anonymous';
+    const user = request?.user?.sub || 'anonymous';
     
     // Récupérer les métadonnées du décorateur
     const handler = context.getHandler();

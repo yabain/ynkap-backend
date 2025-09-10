@@ -73,7 +73,7 @@
                                         "subscriberMsisdn":financialTransaction.phoneNumber,
                                         "pin":this.configService.get("OM_API_PIN"),
                                         "orderId": financialTransaction.ref,
-                                        "description":financialTransaction.description,
+                                        "description":financialTransaction.description || financialTransaction.raison || "Paiement",
                                         "payToken":result.data.data.payToken
                                     }
                                 })

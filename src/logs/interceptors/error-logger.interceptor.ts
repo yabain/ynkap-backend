@@ -24,7 +24,7 @@ export class ErrorLoggerInterceptor implements NestInterceptor {
         
         // Extraire les informations de la requête
         const { method, url, body, headers, query, params } = request;
-        const user = request.user?.sub || 'anonymous';
+        const user = request?.user?.sub || 'anonymous';
         
         // Déterminer le niveau de log en fonction du statut HTTP
         let level = LogLevel.ERROR;

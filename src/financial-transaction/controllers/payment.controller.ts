@@ -87,7 +87,7 @@ import { Body, Controller, Post, UseGuards, Req, HttpStatus, Get, Param, ParseUU
                 }
             })
 
-            // @UseGuards(AppAuthJwtGuard)
+     //@UseGuards(AppAuthJwtGuard)
         @Post("pay")
         @Public()
         @ApiOperation({
@@ -98,9 +98,9 @@ import { Body, Controller, Post, UseGuards, Req, HttpStatus, Get, Param, ParseUU
         @ApiBody({ type: CreateFinancialTransactionDTO })
         @LogTransaction()
         async makePayment(@Req() request:Request, @Body() createFinancialTransactionDTO:CreateFinancialTransactionDTO)
-            {
-                return await this.paymentService.makePayment(createFinancialTransactionDTO)     
-            }
+    {
+        return await this.paymentService.makePayment(createFinancialTransactionDTO);
+    }
 
 
             @Post("orange-money-notify-payment")
@@ -130,7 +130,7 @@ import { Body, Controller, Post, UseGuards, Req, HttpStatus, Get, Param, ParseUU
                     "message": "Opération réussie",
                     "data": {
                         "userRef": {
-                            "fullName": "Cédric Nguendap",
+                            "fullName": "Ulrich Waba",
                             "account": "659396163"
                         },
                         "_id": "67496f52146c3a985bdcc470",

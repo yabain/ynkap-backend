@@ -20,7 +20,7 @@ export class TransactionLoggerInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const now = Date.now();
     const request = context.switchToHttp().getRequest();
-    const user = request.user?.sub || 'anonymous';
+    const user = request?.user?.sub || 'anonymous';
     
     return next.handle().pipe(
       tap({
