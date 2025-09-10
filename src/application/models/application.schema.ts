@@ -24,7 +24,7 @@ export class Application extends Document {
     name: string;
 
     @Prop({required: true})
-    user: string;
+    user?: string;
 
     @Prop({required: true})
     urlToCallback: string;
