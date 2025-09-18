@@ -14,6 +14,7 @@ import { FinancialTransactionModule } from './financial-transaction/financial-tr
 import { FinancialPaymentModule } from './financial-payment/financial-payment.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { FAQModule } from './faq/faq.module';
+import { AttachmentModule } from './attachment/attachment.module';
 
 @Module({
   imports: [
@@ -28,7 +29,8 @@ import { FAQModule } from './faq/faq.module';
     FinancialTransactionModule,
     FinancialPaymentModule,
     NotificationsModule,
-    FAQModule
+    FAQModule,
+    AttachmentModule
   ],
   controllers: [AppController],
   providers: [

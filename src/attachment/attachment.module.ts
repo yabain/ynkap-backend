@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HttpModule } from '@nestjs/axios';
 import { MulterModule } from '@nestjs/platform-express';
@@ -12,7 +12,8 @@ import { AttachmentController } from './controllers/attachment.controller';
 
 // Services
 import { AttachmentService } from './services/attachment.service';
-import { GoogleCloudStorageService } from './services/google-cloud-storage.service';
+import { AwsS3Service } from './services/aws-s3.service';
+// import { GoogleCloudStorageService } from './services/google-cloud-storage.service';
 import { FileValidationService } from './services/file-validation.service';
 import { ThumbnailService } from './services/thumbnail.service';
 
@@ -68,7 +69,7 @@ import { MessageModule } from '../message/message.module';
     HttpModule,
     
     // Forward references to avoid circular dependencies
-    TicketModule,
+    forwardRef(() => TicketModule),
     MessageModule
   ],
   
@@ -76,14 +77,16 @@ import { MessageModule } from '../message/message.module';
   
   providers: [
     AttachmentService,
-    GoogleCloudStorageService,
+    AwsS3Service,
+    // GoogleCloudStorageService,
     FileValidationService,
     ThumbnailService
   ],
   
   exports: [
     AttachmentService,
-    GoogleCloudStorageService
+    AwsS3Service
+    // GoogleCloudStorageService
   ]
 })
 export class AttachmentModule {}

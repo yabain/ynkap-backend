@@ -53,6 +53,27 @@ export class Message extends Document {
 
     @Prop({type: [String], default: []})
     attachments: string[];
+
+    // Enhanced attachment support
+    @Prop({
+        type: [{
+            attachmentId: { type: String, required: true },
+            fileName: { type: String, required: true },
+            fileType: { type: String, required: true },
+            fileSize: { type: Number, required: true },
+            url: { type: String, required: true },
+            thumbnailUrl: { type: String, default: null }
+        }],
+        default: []
+    })
+    attachmentDetails: {
+        attachmentId: string;
+        fileName: string;
+        fileType: string;
+        fileSize: number;
+        url: string;
+        thumbnailUrl?: string;
+    }[];
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message)

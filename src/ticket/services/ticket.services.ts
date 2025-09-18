@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Inject, forwardRef } from "@nestjs/common";
 import { DataBaseService } from "src/shared/database/database.service";
 import { Ticket, TicketDocument } from "../models/ticket.schema";
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
@@ -15,6 +15,7 @@ import { EnhancedTicket, UserInfo } from "../interfaces/enhanced-ticket.interfac
 import { MessageService } from "../../message/services/message.service";
 import { NotificationType } from "../../notifications/dto/create-notification.dto";
 import { TicketStatusManagementService } from "./ticket-status-management.service";
+import { AttachmentService } from "../../attachment/services/attachment.service";
 
 /**
  * Service for handling ticket-related operations
@@ -29,7 +30,9 @@ export class TicketService extends DataBaseService<TicketDocument> {
         private ticketHistoryService: TicketHistoryService,
         private notificationService: NotificationService,
         private messageService: MessageService,
-        private statusManagementService: TicketStatusManagementService
+        private statusManagementService: TicketStatusManagementService,
+        @Inject(forwardRef(() => AttachmentService))
+        private attachmentService: AttachmentService
     ) {
         super(ticketModel, connection);
     }
@@ -82,13 +85,20 @@ export class TicketService extends DataBaseService<TicketDocument> {
                 const randomIndex = Math.floor(Math.random() * userSolvers.length);
                 const solver = userSolvers[randomIndex];
 
+                // Get attachment details if provided
+                let attachmentDetails = [];
+                if (createTicketDto.attachments && createTicketDto.attachments.length > 0) {
+                    attachmentDetails = await this.attachmentService.getAttachmentDetails(createTicketDto.attachments);
+                }
+
                 const initialMessage = {
                     sender: req['user']['sub'],
                     content: createTicketDto.description,
                     createdAt: new Date(),
-                    attachments: [],
+                    attachments: createTicketDto.attachments || [],
                     relatedFaqs: [],
-                    isDescription: true  // Mark this as the ticket description message
+                    isDescription: true,  // Mark this as the ticket description message
+                    attachmentDetails: attachmentDetails
                 };
 
                 const newTicket = this.createInstance({
@@ -96,16 +106,24 @@ export class TicketService extends DataBaseService<TicketDocument> {
                     user: req['user']['sub'],
                     assignTo: solver,
                     messages: [initialMessage],
-                    attachments: [],
+                    attachments: createTicketDto.attachments || [],
                     relatedFaqs: [],
                     notificationHistory: []
                 });
 
                 await newTicket.save({ session });
+                
+                // Link attachments to the ticket (they are already in temp directory)
+                if (createTicketDto.attachments && createTicketDto.attachments.length > 0) {
+                    await this.attachmentService.linkAttachmentsToTicket(
+                        createTicketDto.attachments,
+                        newTicket._id.toString()
+                    );
+                }
                 console.log('Created ticket with messages:', newTicket.messages);
                 console.log('Number of messages in new ticket:', newTicket.messages.length);
                 
-                await this.ticketHistoryService.createHistory(newTicket._id, null, TicketStatus.OPEN, req['user']['sub']);
+                await this.ticketHistoryService.createHistory(newTicket._id, null, TicketStatus.OPENED, req['user']['sub']);
                 
                 // Send comprehensive notifications (database + email)
                 try {
@@ -448,13 +466,13 @@ export class TicketService extends DataBaseService<TicketDocument> {
             ticket.status = newStatus;
 
             // Update additional fields based on status
-            if (newStatus === TicketStatus.SOLVE && updateStatusDto.resolutionNotes) {
+            if (newStatus === TicketStatus.SOLVED && updateStatusDto.resolutionNotes) {
                 ticket.resolutionNotes = updateStatusDto.resolutionNotes;
                 ticket.resolutionDate = new Date();
             }
 
-            if (newStatus === TicketStatus.CLOSE) {
-                if (currentStatus !== TicketStatus.SOLVE && updateStatusDto.rejectionReason) {
+            if (newStatus === TicketStatus.CLOSED) {
+                if (currentStatus !== TicketStatus.SOLVED && updateStatusDto.rejectionReason) {
                     ticket.rejectionReason = updateStatusDto.rejectionReason;
                 }
             }
@@ -557,9 +575,15 @@ export class TicketService extends DataBaseService<TicketDocument> {
             throw new ForbiddenException('You are not authorized to add messages to this ticket');
         }
 
-        // Validate attachments
+        // Get attachment details if provided
+        let attachmentDetails = [];
         if (messageDto.attachments && messageDto.attachments.length > 0) {
-            // Add validation logic for attachments if needed
+            attachmentDetails = await this.attachmentService.getAttachmentDetails(messageDto.attachments);
+            // Link attachments to the ticket
+            await this.attachmentService.linkAttachmentsToTicket(
+                messageDto.attachments,
+                ticketId
+            );
         }
 
         const message = {
@@ -567,7 +591,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
             content: messageDto.content,
             createdAt: new Date(),
             attachments: messageDto.attachments || [],
-            relatedFaqs: messageDto.relatedFaqs || []
+            relatedFaqs: messageDto.relatedFaqs || [],
+            attachmentDetails: attachmentDetails
         };
 
         ticket.messages.push(message);

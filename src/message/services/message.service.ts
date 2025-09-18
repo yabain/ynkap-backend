@@ -54,10 +54,11 @@ export class MessageService extends DataBaseService<MessageDocument> {
     }
 
     async getMessagesByTicketId(ticketID): Promise<Message[]>{
-        // Get all messages and populate reply information
+        // Get all messages and populate reply information and attachments
         const messages = await this.messageModel
             .find({ticket: ticketID.toString()})
             .populate('replyTo')
+            .populate('attachmentDetails')
             .sort({ createdAt: 1 })
             .exec();
 
@@ -65,7 +66,13 @@ export class MessageService extends DataBaseService<MessageDocument> {
     }
 
     async getMessagesByTicketIdWithReplies(ticketID): Promise<any[]> {
-        const messages = await this.getMessagesByTicketId(ticketID);
+        // Get all messages with attachments populated
+        const messages = await this.messageModel
+            .find({ticket: ticketID.toString()})
+            .populate('replyTo')
+            .populate('attachmentDetails')
+            .sort({ createdAt: 1 })
+            .exec();
 
         console.log(' Raw messages from DB:', messages.length);
         messages.forEach(msg => {

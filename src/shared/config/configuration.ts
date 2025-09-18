@@ -15,11 +15,13 @@ export default () => ({
     SMTP_USER: process.env.SMTP_USER,
     SMTP_PASS: process.env.SMTP_PASS,
 
-    // Google Cloud Storage Configuration
-    GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
-    GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,
-    GCS_KEY_FILENAME: process.env.GCS_KEY_FILENAME,
-    GCS_PUBLIC_URL: process.env.GCS_PUBLIC_URL || 'https://storage.googleapis.com',
+
+    // AWS S3 Configuration
+    AWS_REGION: process.env.AWS_REGION || 'eu-west-3',
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
+    AWS_S3_PUBLIC_URL: process.env.AWS_S3_PUBLIC_URL,
 
     // File Upload Configuration
     MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE, 10) || 52428800, // 50MB

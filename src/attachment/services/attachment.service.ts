@@ -8,7 +8,6 @@ import * as path from 'path';
 import { Attachment, AttachmentDocument, FileType, UploadStatus } from '../models/attachment.schema';
 
 // Services
-import { GoogleCloudStorageService } from './google-cloud-storage.service';
 import { FileValidationService } from './file-validation.service';
 import { ThumbnailService } from './thumbnail.service';
 
@@ -25,7 +24,6 @@ export class AttachmentService {
 
   constructor(
     @InjectModel(Attachment.name) private attachmentModel: Model<AttachmentDocument>,
-    private gcsService: GoogleCloudStorageService,
     private validationService: FileValidationService,
     private thumbnailService: ThumbnailService
   ) {}
@@ -49,21 +47,18 @@ export class AttachmentService {
       );
 
       if (!validationResult.isValid) {
-        // Clean up temp file
-        await this.gcsService.cleanupTempFile(file.path);
+        await this.cleanupTempFile(file.path);
         throw new BadRequestException(`File validation failed: ${validationResult.errors.join(', ')}`);
       }
 
-      // 2. Upload to Google Cloud Storage
-      const uploadResult = await this.gcsService.uploadFile(
+      // 2. Move file to permanent uploads directory
+      const uploadResult = await this.moveToPermanentDirectory(
         file.path,
-        file.originalname,
-        file.mimetype,
-        this.getUploadFolder(createAttachmentDto.ticketId, createAttachmentDto.messageId)
+        file.originalname
       );
 
       // 3. Extract metadata
-      const metadata = await this.extractFileMetadata(file.path, validationResult.fileType);
+      const metadata = await this.extractFileMetadata(uploadResult.filePath, validationResult.fileType);
 
       // 4. Create attachment record
       const attachment = new this.attachmentModel({
@@ -77,9 +72,7 @@ export class AttachmentService {
         messageId: createAttachmentDto.messageId || null,
         ticketId: createAttachmentDto.ticketId || null,
         isPublic: createAttachmentDto.isPublic ?? true,
-        gcsFileName: uploadResult.fileName,
-        gcsBucket: uploadResult.bucket,
-        gcsPath: uploadResult.gcsPath,
+        filePath: uploadResult.filePath,
         uploadStatus: UploadStatus.COMPLETED,
         metadata,
         metadataExtracted: true
@@ -89,18 +82,14 @@ export class AttachmentService {
 
       // 5. Generate thumbnail for images (async)
       if (validationResult.fileType === FileType.IMAGE) {
-        this.generateThumbnailAsync(savedAttachment._id.toString(), file.path);
+        this.generateThumbnailAsync(savedAttachment._id.toString(), uploadResult.filePath);
       }
-
-      // 6. Clean up temp file
-      await this.gcsService.cleanupTempFile(file.path);
 
       this.logger.log(`✅ File uploaded successfully: ${savedAttachment._id}`);
       return savedAttachment;
 
     } catch (error) {
-      // Clean up temp file on error
-      await this.gcsService.cleanupTempFile(file.path);
+      await this.cleanupTempFile(file.path);
       this.logger.error(`❌ File upload failed: ${file.originalname}`, error);
       throw error;
     }
@@ -179,53 +168,26 @@ export class AttachmentService {
   }
 
   /**
-   * Get attachments by user
-   */
-  async findByUser(userId: string, limit: number = 50): Promise<Attachment[]> {
-    return this.attachmentModel
-      .find({ uploadedBy: userId, isDeleted: false })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .exec();
-  }
-
-  /**
-   * Update attachment
-   */
-  async update(id: string, updateAttachmentDto: UpdateAttachmentDto): Promise<Attachment> {
-    const attachment = await this.attachmentModel
-      .findOneAndUpdate(
-        { _id: id, isDeleted: false },
-        { ...updateAttachmentDto, updatedAt: new Date() },
-        { new: true }
-      )
-      .exec();
-
-    if (!attachment) {
-      throw new NotFoundException(`Attachment with ID ${id} not found`);
-    }
-
-    this.logger.log(`✅ Attachment updated: ${id}`);
-    return attachment;
-  }
-
-  /**
    * Delete attachment (soft delete)
    */
   async delete(id: string, deletedBy: string): Promise<boolean> {
     const attachment = await this.findById(id);
 
-    // Delete from Google Cloud Storage
+    // Delete from local storage
     try {
-      await this.gcsService.deleteFile(attachment.gcsPath);
+      if (attachment.filePath && fs.existsSync(attachment.filePath)) {
+        fs.unlinkSync(attachment.filePath);
+      }
       
       // Delete thumbnail if exists
       if (attachment.thumbnailUrl) {
-        const thumbnailPath = attachment.gcsPath.replace(/\.[^/.]+$/, '_thumb.jpg');
-        await this.gcsService.deleteFile(thumbnailPath);
+        const thumbnailPath = attachment.filePath?.replace(/\.[^/.]+$/, '_thumb.jpg');
+        if (thumbnailPath && fs.existsSync(thumbnailPath)) {
+          fs.unlinkSync(thumbnailPath);
+        }
       }
     } catch (error) {
-      this.logger.error(`❌ Failed to delete file from GCS: ${attachment.gcsPath}`, error);
+      this.logger.error(`❌ Failed to delete file: ${attachment.filePath}`, error);
     }
 
     // Soft delete in database
@@ -250,85 +212,43 @@ export class AttachmentService {
    */
   async getDownloadUrl(id: string, expirationMinutes: number = 60): Promise<string> {
     const attachment = await this.findById(id);
+    return attachment.url;
+  }
+
+  /**
+   * Move file to permanent uploads directory (keeping in temp for now)
+   */
+  private async moveToPermanentDirectory(
+    tempFilePath: string,
+    originalName: string
+  ): Promise<{ url: string; filePath: string; fileName: string; size: number }> {
+    // Use the configured temp directory
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'temp');
     
-    // For public files, return direct URL
-    if (attachment.isPublic) {
-      return attachment.url;
+    // Ensure directory exists
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
-    // For private files, generate signed URL
-    return this.gcsService.generateSignedUrl(attachment.gcsPath, expirationMinutes);
-  }
+    // Generate unique filename
+    const timestamp = Date.now();
+    const ext = path.extname(originalName);
+    const baseName = path.basename(originalName, ext);
+    const fileName = `${baseName}_${timestamp}${ext}`;
+    const finalPath = path.join(uploadsDir, fileName);
 
-  /**
-   * Generate thumbnail
-   */
-  async generateThumbnail(id: string, width: number = 150, height: number = 150): Promise<string> {
-    const attachment = await this.findById(id);
-
-    if (attachment.fileType !== FileType.IMAGE) {
-      throw new BadRequestException('Thumbnails can only be generated for images');
-    }
-
-    if (attachment.thumbnailUrl) {
-      return attachment.thumbnailUrl;
-    }
-
-    try {
-      const thumbnailUrl = await this.thumbnailService.generateThumbnail(
-        attachment.gcsPath,
-        width,
-        height
-      );
-
-      // Update attachment with thumbnail URL
-      await this.attachmentModel
-        .updateOne(
-          { _id: id },
-          { 
-            thumbnailUrl, 
-            thumbnailGenerated: true,
-            updatedAt: new Date()
-          }
-        )
-        .exec();
-
-      this.logger.log(`✅ Thumbnail generated for attachment: ${id}`);
-      return thumbnailUrl;
-
-    } catch (error) {
-      this.logger.error(`❌ Failed to generate thumbnail for ${id}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get upload statistics
-   */
-  async getUploadStats(userId?: string): Promise<any> {
-    const matchStage: any = { isDeleted: false };
-    if (userId) {
-      matchStage.uploadedBy = userId;
-    }
-
-    const stats = await this.attachmentModel.aggregate([
-      { $match: matchStage },
-      {
-        $group: {
-          _id: null,
-          totalFiles: { $sum: 1 },
-          totalSize: { $sum: '$fileSize' },
-          byType: {
-            $push: {
-              type: '$fileType',
-              size: '$fileSize'
-            }
-          }
-        }
-      }
-    ]);
-
-    return stats[0] || { totalFiles: 0, totalSize: 0, byType: [] };
+    // Move file
+    fs.renameSync(tempFilePath, finalPath);
+    
+    // Get file size
+    const stats = fs.statSync(finalPath);
+    
+    return {
+      url: `/uploads/temp/${fileName}`,
+      filePath: finalPath,
+      fileName: fileName,
+      size: stats.size
+    };
   }
 
   /**
@@ -350,31 +270,167 @@ export class AttachmentService {
   }
 
   /**
-   * Get upload folder path
-   */
-  private getUploadFolder(ticketId?: string, messageId?: string): string {
-    if (messageId) {
-      return `attachments/messages/${messageId}`;
-    } else if (ticketId) {
-      return `attachments/tickets/${ticketId}`;
-    }
-    return 'attachments/general';
-  }
-
-  /**
    * Generate thumbnail asynchronously
    */
-  private async generateThumbnailAsync(attachmentId: string, tempFilePath: string): Promise<void> {
+  private async generateThumbnailAsync(attachmentId: string, filePath: string): Promise<void> {
     try {
       setTimeout(async () => {
         try {
-          await this.generateThumbnail(attachmentId);
+          // Generate thumbnail logic here
         } catch (error) {
           this.logger.error(`❌ Async thumbnail generation failed for ${attachmentId}:`, error);
         }
       }, 1000);
     } catch (error) {
       this.logger.error(`❌ Failed to schedule thumbnail generation:`, error);
+    }
+  }
+
+  /**
+   * Find attachments by user
+   */
+  async findByUser(userId: string, limit: number = 50): Promise<Attachment[]> {
+    return this.attachmentModel
+      .find({ uploadedBy: userId, isDeleted: false })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
+  /**
+   * Get upload statistics for user
+   */
+  async getUploadStats(userId: string): Promise<any> {
+    const stats = await this.attachmentModel.aggregate([
+      { $match: { uploadedBy: userId, isDeleted: false } },
+      {
+        $group: {
+          _id: null,
+          totalFiles: { $sum: 1 },
+          totalSize: { $sum: '$fileSize' },
+          fileTypes: { $addToSet: '$fileType' }
+        }
+      }
+    ]);
+
+    return stats[0] || { totalFiles: 0, totalSize: 0, fileTypes: [] };
+  }
+
+  /**
+   * Generate thumbnail for attachment
+   */
+  async generateThumbnail(id: string, width: number = 200, height: number = 200): Promise<string> {
+    const attachment = await this.findById(id);
+    
+    if (attachment.fileType !== FileType.IMAGE) {
+      throw new BadRequestException('Thumbnails can only be generated for images');
+    }
+
+    try {
+      const thumbnailUrl = await this.thumbnailService.generateThumbnail(
+        attachment.filePath,
+        width,
+        height
+      );
+      
+      // Update attachment with thumbnail URL
+      await this.attachmentModel.updateOne(
+        { _id: id },
+        { thumbnailUrl, updatedAt: new Date() }
+      );
+      
+      return thumbnailUrl;
+    } catch (error) {
+      this.logger.error(`❌ Failed to generate thumbnail for ${id}:`, error);
+      throw new BadRequestException('Failed to generate thumbnail');
+    }
+  }
+
+  /**
+   * Update attachment
+   */
+  async update(id: string, updateAttachmentDto: UpdateAttachmentDto): Promise<Attachment> {
+    const attachment = await this.findById(id);
+    
+    const updatedAttachment = await this.attachmentModel
+      .findByIdAndUpdate(
+        id,
+        { ...updateAttachmentDto, updatedAt: new Date() },
+        { new: true }
+      )
+      .exec();
+
+    if (!updatedAttachment) {
+      throw new NotFoundException(`Attachment with ID ${id} not found`);
+    }
+
+    return updatedAttachment;
+  }
+
+  /**
+   * Link attachments to a ticket and its first message
+   */
+  async linkAttachmentsToTicket(
+    attachmentIds: string[],
+    ticketId: string,
+    messageId?: string
+  ): Promise<void> {
+    if (!attachmentIds || attachmentIds.length === 0) {
+      return;
+    }
+
+    try {
+      const updateData: any = { ticketId, updatedAt: new Date() };
+      if (messageId) {
+        updateData.messageId = messageId;
+      }
+
+      await this.attachmentModel.updateMany(
+        { _id: { $in: attachmentIds }, isDeleted: false },
+        updateData
+      );
+
+      this.logger.log(`✅ Linked ${attachmentIds.length} attachments to ticket ${ticketId}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to link attachments to ticket:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get attachment details for IDs
+   */
+  async getAttachmentDetails(attachmentIds: string[]): Promise<any[]> {
+    if (!attachmentIds || attachmentIds.length === 0) {
+      return [];
+    }
+
+    const attachments = await this.attachmentModel
+      .find({ _id: { $in: attachmentIds }, isDeleted: false })
+      .select('_id fileName originalName fileType fileSize url thumbnailUrl')
+      .exec();
+
+    return attachments.map(att => ({
+      attachmentId: att._id.toString(),
+      fileName: att.originalName,
+      fileType: att.fileType,
+      fileSize: att.fileSize,
+      url: att.url,
+      thumbnailUrl: att.thumbnailUrl
+    }));
+  }
+
+  /**
+   * Clean up temporary file
+   */
+  private async cleanupTempFile(filePath: string): Promise<void> {
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        this.logger.log(`✅ Temp file cleaned up: ${filePath}`);
+      }
+    } catch (error) {
+      this.logger.error(`❌ Failed to clean up temp file: ${filePath}`, error);
     }
   }
 }

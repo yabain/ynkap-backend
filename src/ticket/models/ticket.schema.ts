@@ -31,7 +31,7 @@ export class Ticket extends Document {
     @Prop({required: true})
     type: TicketTypes;
 
-    @Prop({default: TicketStatus.OPEN})
+    @Prop({default: TicketStatus.OPENED})
     status: TicketStatus;
 
     @Prop({required: true})

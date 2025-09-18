@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpStatus, UseGuards, Logger, Req, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
-import { AuthenticatedUser } from 'nest-keycloak-connect';
+import { AuthenticatedUser, Public } from 'nest-keycloak-connect';
 import { Request } from 'express';
 import { FAQService } from '../services/faq.service';
 import { PaginatedFAQResult, FAQSuggestion, BatchOperationResponse } from '../interfaces/faq.interfaces';
@@ -99,6 +99,7 @@ export class FAQController {
     }
 
     @Get('popular')
+    @Public()
     @ApiOperation({ 
         summary: 'Get popular FAQs',
         description: 'Retrieve the most viewed FAQs'
@@ -110,11 +111,9 @@ export class FAQController {
         type: [FAQ]
     })
     async findPopular(
-        @Query('limit') limit?: number,
-        @AuthenticatedUser() user?: any,
-        @Req() req?: Request
+        @Query('limit') limit?: number
     ): Promise<FAQ[]> {
-        this.logger.log(`Getting popular FAQs with limit: ${limit || 10} for user: ${user?.preferred_username || 'unknown'}`);
+        this.logger.log(`Getting popular FAQs with limit: ${limit || 10}`);
         return await this.faqService.findPopular(limit);
     }
 
@@ -442,6 +441,67 @@ export class FAQController {
         return {
             message: `${updated} FAQs deactivated successfully`,
             updated
+        };
+    }
+
+    @Post('seed')
+    @Public()
+    @ApiOperation({
+        summary: 'Seed sample FAQs',
+        description: 'Create sample FAQs for testing (development only)'
+    })
+    async seedFAQs(): Promise<{ message: string; created: number }> {
+        const sampleFAQs = [
+            {
+                question: 'Comment créer un compte Y-Nkap ?',
+                answer: 'Pour créer un compte Y-Nkap, rendez-vous sur notre page d\'inscription, remplissez le formulaire avec vos informations personnelles et suivez les instructions de vérification par email.',
+                tags: ['compte', 'inscription', 'création'],
+                isActive: true,
+                viewCount: 150
+            },
+            {
+                question: 'Quels sont les frais de transaction ?',
+                answer: 'Les frais de transaction varient selon le type d\'opération. Pour les paiements mobiles, les frais sont de 1% du montant. Pour les virements bancaires, les frais sont fixes à 500 FCFA.',
+                tags: ['frais', 'transaction', 'paiement'],
+                isActive: true,
+                viewCount: 200
+            },
+            {
+                question: 'Comment intégrer l\'API Y-Nkap ?',
+                answer: 'L\'intégration de l\'API Y-Nkap se fait en 3 étapes : 1) Créer votre compte développeur, 2) Obtenir vos clés API, 3) Suivre notre documentation technique disponible dans l\'espace développeur.',
+                tags: ['api', 'intégration', 'développeur'],
+                isActive: true,
+                viewCount: 180
+            },
+            {
+                question: 'Que faire en cas de transaction échouée ?',
+                answer: 'En cas de transaction échouée, vérifiez d\'abord votre solde et la validité de vos informations. Si le problème persiste, contactez notre support avec le numéro de transaction.',
+                tags: ['transaction', 'échec', 'support'],
+                isActive: true,
+                viewCount: 120
+            },
+            {
+                question: 'Comment sécuriser mon compte ?',
+                answer: 'Pour sécuriser votre compte : utilisez un mot de passe fort, activez l\'authentification à deux facteurs, ne partagez jamais vos identifiants et surveillez régulièrement vos transactions.',
+                tags: ['sécurité', 'compte', 'protection'],
+                isActive: true,
+                viewCount: 95
+            }
+        ];
+
+        let created = 0;
+        for (const faqData of sampleFAQs) {
+            try {
+                await this.faqService.create(faqData, 'system');
+                created++;
+            } catch (error) {
+                this.logger.warn(`Failed to create sample FAQ: ${error.message}`);
+            }
+        }
+
+        return {
+            message: `${created} sample FAQs created successfully`,
+            created
         };
     }
 }

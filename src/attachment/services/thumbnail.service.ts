@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GoogleCloudStorageService } from './google-cloud-storage.service';
 
 @Injectable()
 export class ThumbnailService {
@@ -10,7 +9,6 @@ export class ThumbnailService {
   private readonly tempDir: string;
 
   constructor(
-    private gcsService: GoogleCloudStorageService,
     private configService: ConfigService
   ) {
     this.tempDir = this.configService.get<string>('TEMP_DIR') || './uploads/temp';
@@ -31,17 +29,17 @@ export class ThumbnailService {
    * TODO: Implement actual thumbnail generation with Sharp or alternative
    */
   async generateThumbnail(
-    gcsPath: string,
+    filePath: string,
     width: number = 150,
     height: number = 150,
     quality: number = 80
   ): Promise<string> {
-    this.logger.log(`🖼️ Thumbnail generation requested for: ${gcsPath}`);
+    this.logger.log(`🖼️ Thumbnail generation requested for: ${filePath}`);
     this.logger.warn(`⚠️ Thumbnail generation not implemented - Sharp dependency not available`);
 
     // For now, return the original image URL
-    // In production, you would implement actual thumbnail generation
-    const originalUrl = `https://storage.googleapis.com/your-bucket/${gcsPath}`;
+    // TODO: Implement with Sharp or similar library
+    const originalUrl = `/uploads/attachments/${path.basename(filePath)}`;
 
     this.logger.log(`📝 Returning original image URL as placeholder: ${originalUrl}`);
     return originalUrl;
@@ -51,14 +49,14 @@ export class ThumbnailService {
    * Generate multiple thumbnail sizes (placeholder implementation)
    */
   async generateMultipleThumbnails(
-    gcsPath: string,
+    filePath: string,
     sizes: Array<{ width: number; height: number; suffix: string }>
   ): Promise<{ [key: string]: string }> {
-    this.logger.log(`🖼️ Multiple thumbnail generation requested for: ${gcsPath}`);
+    this.logger.log(`🖼️ Multiple thumbnail generation requested for: ${filePath}`);
     this.logger.warn(`⚠️ Multiple thumbnail generation not implemented - Sharp dependency not available`);
 
     const results: { [key: string]: string } = {};
-    const originalUrl = `https://storage.googleapis.com/your-bucket/${gcsPath}`;
+    const originalUrl = `/uploads/attachments/${path.basename(filePath)}`;
 
     // Return original URL for all requested sizes
     sizes.forEach(size => {
@@ -72,7 +70,7 @@ export class ThumbnailService {
    * Generate thumbnail with custom options (placeholder implementation)
    */
   async generateCustomThumbnail(
-    gcsPath: string,
+    filePath: string,
     options: {
       width?: number;
       height?: number;
@@ -83,18 +81,18 @@ export class ThumbnailService {
       format?: 'jpeg' | 'png' | 'webp';
     }
   ): Promise<string> {
-    this.logger.log(`🖼️ Custom thumbnail generation requested for: ${gcsPath}`);
+    this.logger.log(`🖼️ Custom thumbnail generation requested for: ${filePath}`);
     this.logger.warn(`⚠️ Custom thumbnail generation not implemented - Sharp dependency not available`);
 
-    const originalUrl = `https://storage.googleapis.com/your-bucket/${gcsPath}`;
+    const originalUrl = `/uploads/attachments/${path.basename(filePath)}`;
     return originalUrl;
   }
 
   /**
    * Get image metadata (placeholder implementation)
    */
-  async getImageMetadata(gcsPath: string): Promise<any> {
-    this.logger.log(`📊 Image metadata requested for: ${gcsPath}`);
+  async getImageMetadata(filePath: string): Promise<any> {
+    this.logger.log(`📊 Image metadata requested for: ${filePath}`);
     this.logger.warn(`⚠️ Image metadata extraction not implemented - Sharp dependency not available`);
 
     // Return basic placeholder metadata
@@ -111,20 +109,7 @@ export class ThumbnailService {
   }
 
   /**
-   * Download file from GCS to local temp file
-   */
-  private async downloadFromGCS(gcsPath: string, localPath: string): Promise<void> {
-    // This is a placeholder - implement actual GCS download
-    // For now, we'll assume the file is already available locally
-    // In a real implementation, you would use the GCS client to download the file
-    
-    // TODO: Implement actual GCS file download
-    // const file = this.gcsService.bucket.file(gcsPath);
-    // await file.download({ destination: localPath });
-  }
-
-  /**
-   * Get thumbnail path in GCS
+   * Get thumbnail path for local storage
    */
   private getThumbnailPath(originalPath: string, width: number, height: number, format: string = 'jpg'): string {
     const dir = path.dirname(originalPath);
@@ -136,7 +121,12 @@ export class ThumbnailService {
    * Clean up temporary files
    */
   private async cleanupTempFiles(filePaths: string[]): Promise<void> {
-    const promises = filePaths.map(filePath => this.gcsService.cleanupTempFile(filePath));
+    const promises = filePaths.map(filePath => {
+      // Remove temp file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
     await Promise.all(promises);
   }
 }

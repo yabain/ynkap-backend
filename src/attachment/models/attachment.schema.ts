@@ -80,15 +80,29 @@ export class Attachment extends Document {
   @Prop({ default: false })
   isDeleted: boolean;
 
-  // Google Cloud Storage specific fields
-  @Prop({ required: true })
+  // Google Cloud Storage specific fields (legacy)
+  @Prop({ default: null })
   gcsFileName: string;
 
-  @Prop({ required: true })
+  @Prop({ default: null })
   gcsBucket: string;
 
   @Prop({ default: null })
   gcsPath: string;
+
+  // AWS S3 specific fields
+  @Prop({ default: null })
+  s3Key: string;
+
+  @Prop({ default: null })
+  s3Bucket: string;
+
+  @Prop({ default: null })
+  s3Etag: string;
+
+  // Local file system path
+  @Prop({ default: null })
+  filePath: string;
 
   // Upload status and metadata
   @Prop({ default: UploadStatus.COMPLETED, enum: UploadStatus })

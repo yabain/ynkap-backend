@@ -35,14 +35,15 @@ export class TicketStatusManagementService {
   private readonly statusTransitionRules: StatusTransitionRule[] = [
     // OPEN transitions
     {
-      from: TicketStatus.OPEN,
+      from: TicketStatus.OPENED,
       to: TicketStatus.IN_PROGRESS,
       requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
       description: 'Start working on the ticket'
     },
     {
-      from: TicketStatus.OPEN,
-      to: TicketStatus.CLOSE,
+      from: TicketStatus.OPENED,
+      to: TicketStatus.CLOSED
+      ,
       requiredRoles: ['manager'],
       description: 'Close ticket without resolution (manager only)'
     },
@@ -50,7 +51,7 @@ export class TicketStatusManagementService {
     // IN_PROGRESS transitions
     {
       from: TicketStatus.IN_PROGRESS,
-      to: TicketStatus.SOLVE,
+      to: TicketStatus.SOLVED,
       requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
       conditions: (ticket, user) => {
         // Only assigned solver or manager can mark as solved
@@ -60,13 +61,13 @@ export class TicketStatusManagementService {
     },
     {
       from: TicketStatus.IN_PROGRESS,
-      to: TicketStatus.OPEN,
+      to: TicketStatus.OPENED,
       requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
       description: 'Reopen ticket for further investigation'
     },
     {
       from: TicketStatus.IN_PROGRESS,
-      to: TicketStatus.CLOSE,
+      to: TicketStatus.CLOSED,
       requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
       conditions: (ticket, user) => {
         // Only assigned solver or manager can close from in-progress
@@ -77,13 +78,13 @@ export class TicketStatusManagementService {
 
     // SOLVE transitions
     {
-      from: TicketStatus.SOLVE,
-      to: TicketStatus.CLOSE,
+      from: TicketStatus.SOLVED,
+      to: TicketStatus.CLOSED,
       requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver','manager'],
       description: 'Close solved ticket '
     },
     {
-      from: TicketStatus.SOLVE,
+      from: TicketStatus.SOLVED,
       to: TicketStatus.IN_PROGRESS,
       requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
       description: 'Reopen solved ticket for additional work'
@@ -91,8 +92,8 @@ export class TicketStatusManagementService {
 
     // CLOSE transitions (limited)
     {
-      from: TicketStatus.CLOSE,
-      to: TicketStatus.OPEN,
+      from: TicketStatus.CLOSED,
+      to: TicketStatus.OPENED,
       requiredRoles: ['manager'],
       description: 'Reopen closed ticket (manager only)'
     }
@@ -169,14 +170,14 @@ export class TicketStatusManagementService {
     }
 
     // Validate required fields based on status
-    if (request.newStatus === TicketStatus.SOLVE && !request.resolutionNotes) {
+    if (request.newStatus === TicketStatus.SOLVED && !request.resolutionNotes) {
       return {
         isValid: false,
         error: 'Resolution notes are required when marking ticket as solved'
       };
     }
 
-    if (request.newStatus === TicketStatus.CLOSE && request.currentStatus !== TicketStatus.SOLVE) {
+    if (request.newStatus === TicketStatus.CLOSED && request.currentStatus !== TicketStatus.SOLVED) {
       if (!request.rejectionReason) {
         return {
           isValid: false,
@@ -263,10 +264,10 @@ export class TicketStatusManagementService {
    */
   private getStatusLabel(status: TicketStatus): string {
     const labels = {
-      [TicketStatus.OPEN]: 'Open',
+      [TicketStatus.OPENED]: 'Open',
       [TicketStatus.IN_PROGRESS]: 'In Progress',
-      [TicketStatus.SOLVE]: 'Solved',
-      [TicketStatus.CLOSE]: 'Closed'
+      [TicketStatus.SOLVED]: 'Solved',
+      [TicketStatus.CLOSED]: 'Closed'
     };
     return labels[status] || status;
   }
@@ -276,10 +277,10 @@ export class TicketStatusManagementService {
    */
   private getStatusColor(status: TicketStatus): string {
     const colors = {
-      [TicketStatus.OPEN]: '#007bff',      // Blue
+      [TicketStatus.OPENED]: '#007bff',      // Blue
       [TicketStatus.IN_PROGRESS]: '#ffc107', // Yellow
-      [TicketStatus.SOLVE]: '#28a745',     // Green
-      [TicketStatus.CLOSE]: '#6c757d'      // Gray
+      [TicketStatus.SOLVED]: '#28a745',     // Green
+      [TicketStatus.CLOSED]: '#6c757d'      // Gray
     };
     return colors[status] || '#6c757d';
   }
@@ -289,10 +290,10 @@ export class TicketStatusManagementService {
    */
   private getStatusIcon(status: TicketStatus): string {
     const icons = {
-      [TicketStatus.OPEN]: 'fas fa-folder-open',
+      [TicketStatus.OPENED]: 'fas fa-folder-open',
       [TicketStatus.IN_PROGRESS]: 'fas fa-spinner',
-      [TicketStatus.SOLVE]: 'fas fa-check-circle',
-      [TicketStatus.CLOSE]: 'fas fa-times-circle'
+      [TicketStatus.SOLVED]: 'fas fa-check-circle',
+      [TicketStatus.CLOSED]: 'fas fa-times-circle'
     };
     return icons[status] || 'fas fa-question-circle';
   }

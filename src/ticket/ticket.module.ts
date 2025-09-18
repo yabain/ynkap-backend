@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TicketController } from "./controllers/ticket.controller";
 import { MongooseModule } from "@nestjs/mongoose";
 import { HttpModule } from "@nestjs/axios";
@@ -11,6 +11,7 @@ import { TicketStatusHistory, TicketStatusHistorySchema } from "./models/ticket-
 import { SharedModule } from "src/shared/shared.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MessageModule } from "../message/message.module";
+import { AttachmentModule } from "../attachment/attachment.module";
 
 @Module({
     imports: [
@@ -27,7 +28,8 @@ import { MessageModule } from "../message/message.module";
         HttpModule,
         SharedModule,
         NotificationsModule,
-        MessageModule
+        MessageModule,
+        forwardRef(() => AttachmentModule)
     ],
     controllers: [TicketController],
     exports: [TicketService],

@@ -1,33 +1,10 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseInterceptors,
-  UploadedFile,
-  UploadedFiles,
-  Query,
-  Req,
-  BadRequestException,
-  UseGuards
-} from '@nestjs/common';
+import {Controller,Get,Post,Body,Patch,Param,Delete,UseInterceptors,UploadedFile,UploadedFiles,Query,Req,BadRequestException} from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiConsumes,
-  ApiParam,
-  ApiQuery,
-  ApiBearerAuth
-} from '@nestjs/swagger';
+import {  ApiTags,ApiOperation,ApiResponse,ApiConsumes,ApiParam,  ApiQuery,ApiBearerAuth} from '@nestjs/swagger';
 
 // Services
 import { AttachmentService } from '../services/attachment.service';
-import { GoogleCloudStorageService } from '../services/google-cloud-storage.service';
+// import { GoogleCloudStorageService } from '../services/google-cloud-storage.service';
 import { FileValidationService } from '../services/file-validation.service';
 
 // DTOs
@@ -42,12 +19,10 @@ import { MulterFile } from '../types/multer.types';
 
 @ApiTags('Attachments')
 @Controller('attachments')
-// @UseGuards(JwtAuthGuard)
-// @ApiBearerAuth()
 export class AttachmentController {
   constructor(
     private readonly attachmentService: AttachmentService,
-    private readonly gcsService: GoogleCloudStorageService,
+    // private readonly gcsService: GoogleCloudStorageService,
     private readonly validationService: FileValidationService
   ) {}
 
@@ -67,7 +42,7 @@ export class AttachmentController {
     }
 
     // Get user ID from request (assuming JWT auth)
-    const uploadedBy = req.user?.id || 'anonymous';
+    const uploadedBy = 'anonymous'; // Temporarily disable auth
 
     console.log('📁 📤 File upload request:', {
       originalName: file.originalname,
@@ -95,7 +70,7 @@ export class AttachmentController {
       throw new BadRequestException('No files provided');
     }
 
-    const uploadedBy = req.user?.id || 'anonymous';
+    const uploadedBy = 'anonymous'; // Temporarily disable auth
 
     console.log('📁 📤 Multiple file upload request:', {
       fileCount: files.length,
@@ -112,7 +87,7 @@ export class AttachmentController {
   @ApiResponse({ status: 200, description: 'Configuration retrieved successfully' })
   getConfig() {
     return {
-      gcs: this.gcsService.getConfig(),
+      // gcs: this.gcsService.getConfig(),
       validation: this.validationService.getConfig()
     };
   }
@@ -209,7 +184,7 @@ export class AttachmentController {
   @ApiResponse({ status: 200, description: 'Attachment deleted successfully' })
   @ApiResponse({ status: 404, description: 'Attachment not found' })
   async deleteAttachment(@Param('id') id: string, @Req() req: any) {
-    const deletedBy = req.user?.id || 'anonymous';
+    const deletedBy = 'anonymous'; // Temporarily disable auth
     const success = await this.attachmentService.delete(id, deletedBy);
     return { success };
   }
