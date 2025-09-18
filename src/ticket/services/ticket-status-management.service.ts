@@ -33,7 +33,7 @@ export class TicketStatusManagementService {
 
   // Define status transition rules with role-based permissions
   private readonly statusTransitionRules: StatusTransitionRule[] = [
-    // OPEN transitions
+    // OPEN transitions (support both OPEN and OPENED)
     {
       from: TicketStatus.OPENED,
       to: TicketStatus.IN_PROGRESS,
@@ -41,11 +41,30 @@ export class TicketStatusManagementService {
       description: 'Start working on the ticket'
     },
     {
+      from: 'OPEN' as TicketStatus,
+      to: TicketStatus.IN_PROGRESS,
+      requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
+      description: 'Start working on the ticket'
+    },
+    {
       from: TicketStatus.OPENED,
-      to: TicketStatus.CLOSED
-      ,
-      requiredRoles: ['manager'],
-      description: 'Close ticket without resolution (manager only)'
+      to: TicketStatus.CLOSED,
+      requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
+      conditions: (ticket, user) => {
+        // Only assigned solver or manager can close from opened
+        return ticket.assignTo === user.sub || user.roles.includes('manager');
+      },
+      description: 'Close ticket without resolution (requires rejection reason)'
+    },
+    {
+      from: 'OPEN' as TicketStatus,
+      to: TicketStatus.CLOSED,
+      requiredRoles: ['bugs-solver', 'transactions-solver', 'other-problems-solver', 'manager'],
+      conditions: (ticket, user) => {
+        // Only assigned solver or manager can close from opened
+        return ticket.assignTo === user.sub || user.roles.includes('manager');
+      },
+      description: 'Close ticket without resolution (requires rejection reason)'
     },
 
     // IN_PROGRESS transitions
