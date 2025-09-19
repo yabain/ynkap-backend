@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsString, MinLength, IsOptional, IsArray } from "class-validator";
+import { IsString, MinLength, IsOptional, IsArray, IsNumber, Min, Max } from "class-validator";
 import { TicketTypes } from "../enums/ticket-types.enum";
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -33,6 +33,16 @@ export class CreateTicketDTO {
     @Transform(({value}) => value.toUpperCase())
     @IsString()
     type: TicketTypes;
+
+    @ApiProperty({
+        description: "Priority level of the ticket",
+        example: "Low",
+        required: false,
+        enum: ['High', 'Medium', 'Low']
+    })
+    @IsOptional()
+    @IsString()
+    priority?: 'High' | 'Medium' | 'Low';
 
     @ApiProperty({
         description: "Array of attachment IDs to attach to the ticket",

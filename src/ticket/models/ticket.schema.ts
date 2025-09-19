@@ -70,8 +70,8 @@ export class Ticket extends Document {
     @Prop({default: null})
     rejectionReason: string;
 
-    @Prop({default: 0})
-    priority: number;
+    @Prop({default: 'Low', enum: ['High', 'Medium', 'Low']})
+    priority: 'High' | 'Medium' | 'Low';
 
     @Prop({default: []})
     tags: string[];
