@@ -71,7 +71,13 @@ export class FinancialTransaction extends Document
     wallet:Wallet;
 
     @Prop({default:Date.now(),required:true})
-    createdAt:Date
+    createdAt:Date;
+
+    @Prop()
+    phoneNumber: string;
+
+    @Prop()
+    description: string;
 }
 
 export const FinancialTransactionSchema = SchemaFactory.createForClass(FinancialTransaction)

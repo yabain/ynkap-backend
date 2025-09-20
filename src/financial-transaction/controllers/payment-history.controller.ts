@@ -1,113 +1,134 @@
-import { Body, Controller, Post, UseGuards,Req, HttpStatus, Get, Param, ParseUUIDPipe, UseInterceptors } from "@nestjs/common";
-import { Request } from "express";
-import { AuthJwtGuard as AppAuthJwtGuard } from "src/application/guards"
-import { CreateFinancialTransactionDTO } from "../dtos"
-import { FinancialTransactionService, PaymentService } from "../services"
-import { OrangeMoneyUpdateFinancialTransactionStatus } from "../dtos/orange-money-update-financial-transaction.dto";
-import { Public } from "nest-keycloak-connect";
-import { TransformResponeInterceptor } from "src/shared/interceptors/transform-response.interceptor";
-import mongoose from "mongoose";
-import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Public } from 'nest-keycloak-connect';
+import { FinancialTransactionService } from '../services';
+import mongoose from 'mongoose';
+import { ObjectIDValidationPipe } from 'src/shared/pipes/objectID.pipe';
 
-@Public()
-@UseInterceptors(TransformResponeInterceptor)
-@Controller("payment-history")
-@ApiTags('Transaction-History')
-export class PaymentHistoryController
-{
-    constructor(private paymentService:PaymentService,
-        private financialTransactionService:FinancialTransactionService,
+@ApiTags('Payment History')
+@Controller('payment-history')
+export class PaymentHistoryController {
+  constructor(
+    private readonly financialTransactionService: FinancialTransactionService
+  ) {}
 
-    ){}
-
-    @ApiOperation({
-        summary: "Get all payment transaction history for a specific application ",
-        description: "This method returns all payment transaction history for a specific application "
-    })
-    @ApiParam({ name: 'appID', description: 'ID of the application', example: "66bf8a89203d5fab750c0f63"})
-    @ApiResponse({status: HttpStatus.OK, description: "Transaction-payment history details",
-        example: 
-        {
-            "statusCode": 200,
-            "message": "Opération réussie",
-            "data": [
-                {
-                    "userRef": {
-                        "fullName": "Cédric Nguendap",
-                        "account": "698295368"
-                    },
-                    "_id": "67496c55e555b20e77d3d56a",
-                    "state": "financial_transaction_pending",
-                    "amount": 25,
-                    "raison": "Paiement de frais de scolarité",
-                    "type": "deposit",
-                    "ref": "REF1732864911941",
-                    "token": "MP241129DD2D67ABACD8CC4D4496",
-                    "error": 0,
-                    "paymentMode": "ORANGE",
-                    "application": "6749689642bafee2045b382c",
-                    "moneyCode": "XAF",
-                    "wallet": "6749689642bafee2045b382e",
-                    "createdAt": "2024-11-29T07:21:51.941Z",
-                    "startDate": "2024-11-29T07:25:14.895Z",
-                    "endDate": "2024-11-29T07:25:14.895Z"
-                },
-                {
-                    "userRef": {
-                        "fullName": "Cédric Nguendap",
-                        "account": "698295368"
-                    },
-                    "_id": "67496cf007a47b6052daae0f",
-                    "state": "financial_transaction_pending",
-                    "amount": 25,
-                    "raison": "Paiement de frais de scolarité",
-                    "type": "deposit",
-                    "ref": "REF1732865256294",
-                    "token": "MP241129BA2057EB22C502CD98B8",
-                    "error": 0,
-                    "paymentMode": "ORANGE",
-                    "application": "6749689642bafee2045b382c",
-                    "moneyCode": "XAF",
-                    "wallet": "6749689642bafee2045b382e",
-                    "createdAt": "2024-11-29T07:27:36.294Z",
-                    "startDate": "2024-11-29T07:27:50.413Z",
-                    "endDate": "2024-11-29T07:27:50.413Z"
-                }
-            ]
-        }
-    })
-    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "The application with the id passed in parameter cannot be found", 
-        example: 
-        {
-            "statusCode": 200,
-            "message": "Opération réussie",
-            "data": []
-        }
-    })
-    @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak",
-        example:
-        {
-            "statusCode": 401,
-            "message": "Unauthorized",
-            "data": null,
-            "timestamp": "2024-11-29T09:38:06.439Z"
-        }
-    })
-    @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occured",
-        example:
-        {
-            "statusCode": 500,
-            "message": "An internal error has occurred",
-            "data": null,
-            "timestamp": "2024-11-29T09:38:06.439Z"
-        }
-    })
-    // @UseGuards(AppAuthJwtGuard)
-    @Public()
-    @Get(":appID")    
-    async checkPayment(@Req() request:Request, @Param("appID", ObjectIDValidationPipe) appID:string)
-    {
-        return await this.financialTransactionService.findByField({application:new mongoose.Types.ObjectId(appID)})  
+  @Get(':appID')
+  @ApiOperation({ summary: 'Get all transactions for an application' })
+  @ApiParam({ name: 'appID', description: 'Application ID' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
+  @ApiQuery({ name: 'status', required: false, description: 'Transaction status' })
+  @ApiQuery({ name: 'paymentMode', required: false, description: 'Payment mode (MTN, ORANGE, etc.)' })
+  @Public()
+  async getTransactionsByAppId(
+    @Param('appID', ObjectIDValidationPipe) appID: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: string,
+    @Query('paymentMode') paymentMode?: string
+  ) {
+    try {
+      console.log(`Récupération des transactions pour l'application: ${appID}`);
+      
+      // Construire le filtre avec l'ID de l'application
+      const filter: any = { 
+        application: new mongoose.Types.ObjectId(appID)
+      };
+      
+      if (startDate && endDate) {
+        filter.createdAt = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        };
+      } else if (startDate) {
+        filter.createdAt = { $gte: new Date(startDate) };
+      } else if (endDate) {
+        filter.createdAt = { $lte: new Date(endDate) };
+      }
+      
+      if (status) {
+        filter.state = status;
+      }
+      
+      if (paymentMode) {
+        filter.paymentMode = paymentMode;
+      }
+      
+      console.log('Filtre de recherche:', JSON.stringify(filter, null, 2));
+      
+      // Utiliser findManyDocuments pour obtenir un tableau de transactions
+      const transactions = await this.financialTransactionService.findManyDocuments(filter);
+      
+      console.log(`${transactions.length} transactions trouvées`);
+      
+      return {
+        success: true,
+        count: transactions.length,
+        data: transactions
+      };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des transactions:', error);
+      return {
+        success: false,
+        message: 'Failed to retrieve transactions',
+        error: error.message
+      };
     }
+  }
+
+  @Get('transaction/:transactionId/app/:appID')
+  @ApiOperation({ summary: 'Get a specific transaction for an application' })
+  @ApiParam({ name: 'appID', description: 'Application ID' })
+  @ApiParam({ name: 'transactionId', description: 'Transaction ID' })
+  @Public()
+  async getSpecificTransaction(
+    @Param('appID', ObjectIDValidationPipe) appID: string,
+    @Param('transactionId', ObjectIDValidationPipe) transactionId: string
+  ) {
+    try {
+      console.log(`Récupération de la transaction ${transactionId} pour l'application ${appID}`);
+      
+      const transaction = await this.financialTransactionService.findOneDocument({ 
+        _id: transactionId,
+        application: new mongoose.Types.ObjectId(appID)
+      });
+      
+      if (!transaction) {
+        return {
+          success: false,
+          message: `Transaction with ID ${transactionId} not found for application ${appID}`
+        };
+      }
+      
+      return {
+        success: true,
+        data: transaction
+      };
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la transaction:', error);
+      return {
+        success: false,
+        message: 'Failed to retrieve transaction',
+        error: error.message
+      };
+    }
+  }
+
+  @Get('all')
+  @ApiOperation({ summary: 'Get all transactions with filters (legacy endpoint)' })
+  @ApiQuery({ name: 'appID', required: true, description: 'Application ID' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
+  @ApiQuery({ name: 'status', required: false, description: 'Transaction status' })
+  @ApiQuery({ name: 'paymentMode', required: false, description: 'Payment mode (MTN, ORANGE, etc.)' })
+  @Public()
+  async getAllTransactions(
+    @Query('appID') appID: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('status') status?: string,
+    @Query('paymentMode') paymentMode?: string
+  ) {
+    return this.getTransactionsByAppId(appID, startDate, endDate, status, paymentMode);
+  }
 }

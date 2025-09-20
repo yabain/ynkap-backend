@@ -10,6 +10,8 @@ import { TicketTypes } from "../enums/ticket-types.enum";
 import { Request } from "express"
 
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { LogActivity } from '../../logs/interceptors/activity-logger.interceptor';
+import { LogType } from '../../logs/enums/log-type.enum';
 
 @Controller('tickets')
 @UseInterceptors(TransformResponeInterceptor)
@@ -18,7 +20,7 @@ export class TicketController {
     constructor(private ticketService: TicketService){}
 
     @Post()
-    @CustomMessage("Ticket successfully created")
+    @CustomMessage("Ticket créé avec succès")
     @ApiOperation({
         summary: "Create a new ticket",
         description: "this method creates a new ticket and assigns it to a member of the support team "

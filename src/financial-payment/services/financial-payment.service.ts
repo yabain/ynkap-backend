@@ -8,6 +8,15 @@ import { FinancialTransactionType, PaymentStrategyType } from "../enum";
 export class FinancialPaymentService
 {
     constructor(private paymentBuilder:PaymentBuilder){}
+
+    /**
+     * Retourne le builder de paiement
+     * @returns PaymentBuilder
+     */
+    getPaymentBuilder(): PaymentBuilder {
+        return this.paymentBuilder;
+    }
+    
     makePaiement(financialTransaction:FinancialTransaction):Promise<any>
     {
         return new Promise<any>((resolve,reject)=>{

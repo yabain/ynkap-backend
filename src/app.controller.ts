@@ -1,21 +1,24 @@
-import { Controller, Get, HttpStatus, Redirect, Request, UseGuards } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
 import { AuthenticatedUser, Public } from 'nest-keycloak-connect';
 import { EmailService } from './notifications/services/email.service';
 import { RecaptchaService } from './shared/services/recaptcha.service';
+import { AppService } from './app.service';
+import { ConfigService } from '@nestjs/config/dist/config.service';
 
 @Controller('')
-
 export class AppController {
-
   version = "1.0.0"
   constructor(
+    private readonly appService: AppService,
     private configService: ConfigService,
     private emailService: EmailService,
     private recaptchaService: RecaptchaService
   ) {}
+
+
     @Get()
+    @Public() 
     @ApiResponse({status: HttpStatus.OK, description: "The route displaying the application version"})
     @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
     getMainRoad(): string {
@@ -67,5 +70,6 @@ export class AppController {
       }
     }
     */
+ 
 }
   

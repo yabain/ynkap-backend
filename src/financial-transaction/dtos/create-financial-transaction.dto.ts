@@ -1,84 +1,53 @@
 import { Type } from "class-transformer";
-import {MaxLength,Min,IsEnum,IsNumberString,IsMongoId, MinLength,IsString,IsOptional,IsUrl,IsNotEmpty, IsJSON, IsNumber, IsDefined, IsNotEmptyObject } from "class-validator";
+import {
+    MaxLength, Min, IsEnum, IsNumberString, IsMongoId, 
+    MinLength, IsString, IsOptional, IsUrl, IsNotEmpty, 
+    IsJSON, IsNumber, IsDefined, IsNotEmptyObject, ValidateNested
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 import { Application } from "src/application/models";
 import { FinancialTransactionType, PaymentStrategyType, PaymentMoneyCode } from "src/financial-payment/enum";
 import { Wallet } from "src/wallet/models";
 import { IsValidAmount } from "../decorators/decrease-amount.decorator";
 import { FinancialTransactionState } from "../enum";
 import { UserRefDTO } from "./user-ref.dto";
-import { ApiProperty } from "@nestjs/swagger";
 
 
 
 export class CreateFinancialTransactionDTO
 {
+    @ApiProperty({ description: 'ID de l\'application', required: true })
+    @IsMongoId({ message: 'L\'ID de l\'application doit être un ID MongoDB valide' })
+    @IsNotEmpty({ message: 'L\'ID de l\'application est requis' })
+    appID: string;
 
-    @ApiProperty({
-        description: "Montant du paiement",
-        example: 30,
-        required:true
-    })
-    @Min(1)
-    @IsNumber({},{message:"Montant de la transaction invalide"})
-    // @IsValidAmount()
-    amount:number;
+    @ApiProperty({ description: 'Montant de la transaction', required: true })
+    @IsNumber({}, { message: 'Le montant doit être un nombre' })
+    @Min(1, { message: 'Le montant doit être supérieur à 0' })
+    @IsValidAmount()
+    amount: number;
 
-    @ApiProperty({
-        description: "Type of transaction to be performed",
-        required:true,
-        enum: ['deposit', "withdraw"]
-    })
-    @IsNotEmpty()
-    @IsEnum(FinancialTransactionType)
-    type:FinancialTransactionType;
-    
-   
-    @ApiProperty({
-        description: "Méthode de paiement utilisée",
-        example: 30,
-        required:true
-    })
-    @IsNotEmpty()
-    @IsEnum(PaymentStrategyType,{message:"Mode de paiement non supporté"})
-    paymentMode:PaymentStrategyType;
+    @ApiProperty({ description: 'Type de transaction', enum: FinancialTransactionType, required: true })
+    @IsEnum(FinancialTransactionType, { message: 'Type de transaction invalide' })
+    type: FinancialTransactionType;
 
-    @ApiProperty({
-        description:"Etat de la transaction. Optionnel pour le cas d'une initialisation de la transaction"
-    })
+    @ApiProperty({ description: 'Mode de paiement', enum: PaymentStrategyType, required: true })
+    @IsEnum(PaymentStrategyType, { message: 'Mode de paiement invalide' })
+    paymentMode: PaymentStrategyType;
+
+    @ApiProperty({ description: 'Référence utilisateur', required: false, type: UserRefDTO })
     @IsOptional()
-    @IsEnum(FinancialTransactionState)
-    state:FinancialTransactionState;
+    @ValidateNested()
+    @Type(() => UserRefDTO)
+    userRef?: UserRefDTO;
 
-    @ApiProperty({
-        description:"Monaie supporté : XAF, XOF, EUR, $"
-    })
-    @IsEnum(PaymentMoneyCode,{message:"Monaie non pris en charge"})
-    moneyCode:PaymentMoneyCode;
+    @ApiProperty({ description: 'ID utilisateur', required: false })
+    @IsOptional()
+    @IsString({ message: 'L\'ID utilisateur doit être une chaîne de caractères' })
+    userId?: string;
 
-    @ApiProperty({
-        description:"Information sur le payeur"
-    })
-    @IsDefined()
-    @IsNotEmptyObject({}, {message:"Information sur l'utilisateur invalide"})
-    @Type(()=> UserRefDTO)
-    userRef;
-
-    @ApiProperty({
-        description:"Message affiché comme justificatif de la transaction"
-    })
-    @IsString({message:"Raison du transfert non fournis"})
-    raison:string
-
-    @ApiProperty({
-        description:"Identifiant de l'application"
-    })
-    @IsString({message:"ID de l'application non fournis"})
-    appID:string
-
-    //Invalidate
-    application:Application;
-
-    wallet:Wallet;
-
-
+    // Propriétés internes (non exposées dans l'API)
+    application: Application;
+    wallet: Wallet;
+    state?: FinancialTransactionState;
 }

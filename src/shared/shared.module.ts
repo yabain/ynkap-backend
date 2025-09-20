@@ -6,13 +6,13 @@ import { KeycloakModule } from "src/keycloak/keycloak.module";
 import { RecaptchaService } from "./services/recaptcha.service";
 
 
-@Module({
-    imports:[
-        ConfigModule.forRoot({
-            load: [configuration],
-            envFilePath: process.env.NODE_ENV === 'prod' ? '.env.prod' : '.env.dev', // determine le fichier .env à charger en fonction de la valeur de la variable d'environement 'NODE_ENV'
-            isGlobal: true,
-          }),
+    @Module({
+        imports:[
+            ConfigModule.forRoot({
+                load: [configuration],
+                envFilePath: process.env.NODE_ENV === 'prod' ? '.env.prod' : '.env.dev',
+                isGlobal: true,
+            }),
 
         MongooseModule.forRootAsync({
             imports:[ConfigModule],
@@ -33,4 +33,4 @@ import { RecaptchaService } from "./services/recaptcha.service";
 })
 export class SharedModule {
 
-}
+    }

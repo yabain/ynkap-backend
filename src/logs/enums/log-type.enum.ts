@@ -1,0 +1,17 @@
+export enum LogType {
+  SYSTEM = 'SYSTEM',
+  TRANSACTION = 'TRANSACTION',
+  ACTION = 'ACTION',
+  ACTIVITY = 'ACTIVITY',
+  API = 'API',
+  SECURITY = 'SECURITY',
+  ERROR = 'ERROR',
+  AUDIT = 'AUDIT'
+}
+
+
+
+
+
+
+
