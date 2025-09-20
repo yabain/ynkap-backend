@@ -6,7 +6,11 @@ import { TransformResponeInterceptor } from "src/shared/interceptors/transform-r
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
 import { UpdateStatusTicketDTO } from "../dtos/update-status-ticket.dto";
 import { TicketTypes } from "../enums/ticket-types.enum";
+import { Request } from "express"
+
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { LogActivity } from '../../logs/interceptors/activity-logger.interceptor';
+import { LogType } from '../../logs/enums/log-type.enum';
 
 @Controller('tickets')
 @UseInterceptors(TransformResponeInterceptor)
@@ -15,7 +19,7 @@ export class TicketController {
     constructor(private ticketService: TicketService){}
 
     @Post()
-    @CustomMessage("Ticket successfully created")
+    @CustomMessage("Ticket créé avec succès")
     @ApiOperation({
         summary: "Create a new ticket",
         description: "this method creates a new ticket and assigns it to a member of the support team "
@@ -32,10 +36,10 @@ export class TicketController {
     }
 
     @Get('/user')
-    @CustomMessage("List of the tickets successfully retrieved for this user")
+    @CustomMessage("Liste des tickets récupérés avec succès pour cet utilisateur")
     @ApiOperation({
         summary: "Get all tickets of the connected user",
-        description: "This method returns the ticket list of the connected user, whether a normal user or an agent"
+        description: "Cette méthode renvoie la liste des tickets de l’utilisateur connecté, qu’il soit un utilisateur normal ou un agent"
     })
     @ApiResponse({status: HttpStatus.OK, description: "List of tickets created by the logged-in user"})
     @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})

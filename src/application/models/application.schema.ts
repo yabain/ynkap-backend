@@ -16,14 +16,15 @@ export type ApplicationDocument = HydratedDocument<Application>
         transform: function (dot, ret) {
             delete ret.__v;
         }
-    }
+    },
+    timestamps: true
 })
 export class Application extends Document {
     @Prop({ unique: true, required: true})
     name: string;
 
     @Prop({required: true})
-    user: string;
+    user?: string;
 
     @Prop({required: true})
     urlToCallback: string;
@@ -38,7 +39,7 @@ export class Application extends Document {
     privateKeyProd: string;
 
     @Prop({default: PrivateKey.TEST})
-    privateKeytest: string;
+    privateKeyTest: string; 
 
     @Prop({type: [{type: mongoose.Schema.Types.ObjectId, ref: PaymentMethod.name}], default:[]})
     paymentMethods: PaymentMethod[];
@@ -54,6 +55,27 @@ export class Application extends Document {
     
     @Prop({default: () => Date.now(), required: true})
     createdAt: Date;
+
+    @Prop()
+    previousClientIdProd?: string;
+
+    @Prop()
+    previousPrivateKeyProd?: string;
+
+    @Prop()
+    previousClientIdTest?: string;
+
+    @Prop()
+    previousPrivateKeyTest?: string;
+
+    @Prop()
+    keyRotationDate?: Date;
+
+    @Prop({ default: 0 })
+    keyRotationGracePeriodHours: number; // Période de grâce en heures
+
+    @Prop({ default: false })
+    previousKeysActive: boolean; // Si les anciennes clés sont encore actives
 }
 
 export const ApplicationSchema = SchemaFactory.createForClass(Application)

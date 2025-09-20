@@ -8,10 +8,12 @@ export type WalletDocument = HydratedDocument<Wallet>
     toObject: {
         transform: function (doc, ret) {
             delete ret.__v;
+            delete ret.isDeleted
         }
     },
     toJSON: {
         transform: function (dot, ret) {
+            delete ret.isDeleted
             delete ret.__v;
         }
     }
