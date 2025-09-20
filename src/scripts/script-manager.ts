@@ -19,25 +19,25 @@ const scripts: ScriptInfo[] = [
   {
     name: 'check-transactions',
     description: 'Vérifier les transactions dans la base de données',
-    command: 'npm run check:transactions',
+    command: 'check:transactions',
     category: 'Transactions'
   },
   {
     name: 'fetch-transactions',
     description: 'Récupérer l\'historique des transactions',
-    command: 'npm run fetch:transactions',
+    command: 'fetch:transactions',
     category: 'Transactions'
   },
   {
     name: 'diagnose-transactions',
     description: 'Diagnostiquer les problèmes de transactions',
-    command: 'npm run diagnose:transactions',
+    command: 'diagnose:transactions',
     category: 'Transactions'
   },
   {
     name: 'seed-transactions',
     description: 'Créer des transactions de test',
-    command: 'npm run seed:transactions-simple',
+    command: 'seed:transactions-simple',
     category: 'Transactions'
   },
 
@@ -45,71 +45,79 @@ const scripts: ScriptInfo[] = [
   {
     name: 'payment-history',
     description: 'Récupérer l\'historique des paiements',
-    command: 'npm run history:payments',
+    command: 'history:payments',
     category: 'Paiements'
   },
   {
     name: 'test-payment-methods',
     description: 'Tester les méthodes de paiement',
-    command: 'npm run test:payment-methods',
+    command: 'test:payment-methods',
     category: 'Paiements'
   },
   {
     name: 'test-wallet-payment',
     description: 'Tester les paiements wallet',
-    command: 'npm run test:wallet-payment',
+    command: 'test:wallet-payment',
+    category: 'Paiements'
+  },
+  {
+    name: 'test-production-payment',
+    description: 'Tester les paiements en production',
+    command: 'test:payment-prod',
     category: 'Paiements'
   },
 
   // Scripts MTN
   {
-    name: 'generate-mtn-keys',
-    description: 'Générer les clés MTN Money (dev)',
-    command: 'npm run generate:mtn-keys',
-    category: 'MTN'
-  },
-  {
     name: 'generate-mtn-prod-keys',
     description: 'Générer les clés MTN Money (prod)',
-    command: 'npm run generate:mtn-prod-keys',
+    command: 'generate:mtn-prod-keys',
     category: 'MTN'
   },
   {
     name: 'test-mtn-routes',
-    description: 'Tester les routes MTN',
-    command: 'npm run test:mtn-routes',
+    description: 'Tester les routes MTN en production',
+    command: 'test:mtn-routes-prod',
     category: 'MTN'
   },
   {
     name: 'test-mtn-prod',
     description: 'Tester MTN en production',
-    command: 'npm run test:mtn-prod',
+    command: 'test:mtn-prod',
     category: 'MTN'
   },
   {
     name: 'test-mtn-connectivity',
     description: 'Tester la connectivité MTN',
-    command: 'npm run test:mtn-connectivity',
+    command: 'test:mtn-connectivity',
     category: 'MTN'
+  },
+
+  // Scripts Orange Money
+  {
+    name: 'test-orange-prod',
+    description: 'Tester Orange Money en production',
+    command: 'test:orange-prod',
+    category: 'Orange Money'
   },
 
   // Scripts de logs
   {
     name: 'test-logs',
     description: 'Tester le système de logs',
-    command: 'npm run test:logs',
+    command: 'test:logs',
     category: 'Logs'
   },
   {
     name: 'test-transaction-logs',
     description: 'Tester les logs de transactions',
-    command: 'npm run test:transaction-logs',
+    command: 'test:transaction-logs',
     category: 'Logs'
   },
   {
     name: 'convert-logs-capped',
     description: 'Convertir les logs en collection cappée',
-    command: 'npm run convert:logs-to-capped',
+    command: 'convert:logs-to-capped',
     category: 'Logs'
   },
 
@@ -117,14 +125,40 @@ const scripts: ScriptInfo[] = [
   {
     name: 'extract-app-keys',
     description: 'Extraire les clés d\'une application',
-    command: 'npm run extract:app-keys',
+    command: 'extract:app-keys',
     category: 'Applications'
   },
   {
     name: 'generate-app-test-keys',
     description: 'Générer de nouvelles clés de test pour une application',
-    command: 'npm run generate:app-test-keys',
+    command: 'generate:app-test-keys',
     category: 'Applications'
+  },
+  {
+    name: 'debug-auth',
+    description: 'Déboguer l\'authentification des applications',
+    command: 'debug:auth',
+    category: 'Applications'
+  },
+
+  // Scripts de monitoring et maintenance
+  {
+    name: 'cron-check-pending',
+    description: 'Déclencher manuellement la vérification des transactions PENDING',
+    command: 'start:dev --exec "curl -X POST http://localhost:3000/transaction-status-checker/trigger-manual-check"',
+    category: 'Monitoring'
+  },
+  {
+    name: 'cron-stats',
+    description: 'Voir les statistiques des transactions PENDING',
+    command: 'start:dev --exec "curl http://localhost:3000/transaction-status-checker/pending-stats"',
+    category: 'Monitoring'
+  },
+  {
+    name: 'cron-status',
+    description: 'Vérifier le statut du Cron Job',
+    command: 'start:dev --exec "curl http://localhost:3000/transaction-status-checker/cron-status"',
+    category: 'Monitoring'
   }
 ];
 
@@ -149,14 +183,16 @@ class ScriptManager {
       console.log('1. 📊 Scripts de Transactions');
       console.log('2. 💳 Scripts de Paiements');
       console.log('3. 📱 Scripts MTN Money');
-      console.log('4. 📝 Scripts de Logs');
-      console.log('5. 🔧 Scripts d\'Applications');
-      console.log('6. 📋 Voir tous les scripts');
-      console.log('7. 🔍 Rechercher un script');
-      console.log('8. ❌ Quitter');
+      console.log('4. 🍊 Scripts Orange Money');
+      console.log('5. 📝 Scripts de Logs');
+      console.log('6. 🔧 Scripts d\'Applications');
+      console.log('7. 📈 Scripts de Monitoring');
+      console.log('8. 📋 Voir tous les scripts');
+      console.log('9. 🔍 Rechercher un script');
+      console.log('10. ❌ Quitter');
       console.log('='.repeat(60));
 
-      const choice = await this.question('\n👉 Choisissez une option (1-8): ');
+      const choice = await this.question('\n👉 Choisissez une option (1-10): ');
 
       switch (choice) {
         case '1':
@@ -169,18 +205,24 @@ class ScriptManager {
           await this.showCategoryScripts('MTN');
           break;
         case '4':
-          await this.showCategoryScripts('Logs');
+          await this.showCategoryScripts('Orange Money');
           break;
         case '5':
-          await this.showCategoryScripts('Applications');
+          await this.showCategoryScripts('Logs');
           break;
         case '6':
-          await this.showAllScripts();
+          await this.showCategoryScripts('Applications');
           break;
         case '7':
-          await this.searchScripts();
+          await this.showCategoryScripts('Monitoring');
           break;
         case '8':
+          await this.showAllScripts();
+          break;
+        case '9':
+          await this.searchScripts();
+          break;
+        case '10':
           exit = true;
           break;
         default:

@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/c
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { KeycloakConnectModule, RoleGuard, AuthGuard } from 'nest-keycloak-connect';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApplicationModule } from './application/application.module';
@@ -32,6 +33,7 @@ import { Reflector } from '@nestjs/core';
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV || 'dev'}`
     }),
+    ScheduleModule.forRoot(),
     
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

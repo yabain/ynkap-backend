@@ -6,6 +6,8 @@ import { FinancialTransaction, FinancialTransactionSchema } from './models';
 import { MtnTestController } from './controllers/mtn-test.controller';
 import { PaymentHistoryController } from './controllers/payment-history.controller';
 import { PaymentService } from './services/payment.service';
+import { TransactionStatusCheckerService } from './services/transaction-status-checker.service';
+import { TransactionStatusCheckerController } from './controllers/transaction-status-checker.controller';
 import { FinancialPaymentModule } from 'src/financial-payment/financial-payment.module';
 import { ApplicationModule } from 'src/application/application.module';
 import { WalletModule } from 'src/wallet/wallet.module';
@@ -25,8 +27,8 @@ import { PaymentController } from './controllers/payment.controller';
     forwardRef(() => WalletModule),
     forwardRef(() => LogsModule),
   ],
-  controllers: [MtnTestController, PaymentHistoryController , PaymentController ],
-  providers: [FinancialTransactionService, PaymentService],
-  exports: [FinancialTransactionService, PaymentService],
+  controllers: [MtnTestController, PaymentHistoryController, PaymentController, TransactionStatusCheckerController],
+  providers: [FinancialTransactionService, PaymentService, TransactionStatusCheckerService],
+  exports: [FinancialTransactionService, PaymentService, TransactionStatusCheckerService],
 })
 export class FinancialTransactionModule {}
