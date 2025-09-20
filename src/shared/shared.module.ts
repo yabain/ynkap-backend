@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import configuration from "./config/configuration";
 import { MongooseModule } from "@nestjs/mongoose";
 import { KeycloakModule } from "src/keycloak/keycloak.module";
+import { RecaptchaService } from "./services/recaptcha.service";
 
 
 @Module({
@@ -22,11 +23,12 @@ import { KeycloakModule } from "src/keycloak/keycloak.module";
         }),
         KeycloakModule
     ],
-    providers: [],
+    providers: [RecaptchaService],
     exports: [
         KeycloakModule,
         MongooseModule,
-        ConfigModule
+        ConfigModule,
+        RecaptchaService
     ],
 })
 export class SharedModule {

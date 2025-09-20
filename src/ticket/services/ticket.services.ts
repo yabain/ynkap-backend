@@ -16,6 +16,7 @@ import { MessageService } from "../../message/services/message.service";
 import { NotificationType } from "../../notifications/dto/create-notification.dto";
 import { TicketStatusManagementService } from "./ticket-status-management.service";
 import { AttachmentService } from "../../attachment/services/attachment.service";
+import { RecaptchaService } from "../../shared/services/recaptcha.service";
 
 /**
  * Service for handling ticket-related operations
@@ -32,7 +33,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
         private messageService: MessageService,
         private statusManagementService: TicketStatusManagementService,
         @Inject(forwardRef(() => AttachmentService))
-        private attachmentService: AttachmentService
+        private attachmentService: AttachmentService,
+        private recaptchaService: RecaptchaService
     ) {
         super(ticketModel, connection);
     }
@@ -58,6 +60,18 @@ export class TicketService extends DataBaseService<TicketDocument> {
      */
     async createTicket(createTicketDto: CreateTicketDTO, req: any): Promise<TicketDocument> {
         try {
+            // Verify reCAPTCHA token if provided
+            if (createTicketDto.captchaToken) {
+                const isValidCaptcha = await this.recaptchaService.verifyToken(
+                    createTicketDto.captchaToken,
+                    req.ip || req.connection.remoteAddress
+                );
+                
+                if (!isValidCaptcha) {
+                    throw new BadRequestException('Invalid reCAPTCHA verification. Please try again.');
+                }
+            }
+            
             return await this.executeWithTransaction(async (session) => {
                 const roles = req['user']['realm_access']['roles'];
                 if (roles.includes('manager')) {
@@ -89,6 +103,13 @@ export class TicketService extends DataBaseService<TicketDocument> {
                 let attachmentDetails = [];
                 if (createTicketDto.attachments && createTicketDto.attachments.length > 0) {
                     attachmentDetails = await this.attachmentService.getAttachmentDetails(createTicketDto.attachments);
+                    
+                    // Link attachments to the ticket and first message
+                    await this.attachmentService.linkAttachmentsToTicket(
+                        createTicketDto.attachments,
+                        null, // Will be set after ticket creation
+                        null  // Will be set after message creation
+                    );
                 }
 
                 const initialMessage = {
@@ -98,7 +119,14 @@ export class TicketService extends DataBaseService<TicketDocument> {
                     attachments: createTicketDto.attachments || [],
                     relatedFaqs: [],
                     isDescription: true,  // Mark this as the ticket description message
-                    attachmentDetails: attachmentDetails
+                    attachmentDetails: attachmentDetails.map(att => ({
+                        attachmentId: att._id,
+                        fileName: att.originalName || att.fileName,
+                        fileType: att.fileType,
+                        fileSize: att.fileSize,
+                        url: att.url,
+                        thumbnailUrl: att.thumbnailUrl
+                    }))
                 };
 
                 const newTicket = this.createInstance({
@@ -113,11 +141,12 @@ export class TicketService extends DataBaseService<TicketDocument> {
 
                 await newTicket.save({ session });
                 
-                // Link attachments to the ticket (they are already in temp directory)
+                // Link attachments to the ticket
                 if (createTicketDto.attachments && createTicketDto.attachments.length > 0) {
                     await this.attachmentService.linkAttachmentsToTicket(
                         createTicketDto.attachments,
-                        newTicket._id.toString()
+                        newTicket._id.toString(),
+                        null // Embedded messages don't have separate _id
                     );
                 }
                 console.log('Created ticket with messages:', newTicket.messages);
@@ -400,15 +429,29 @@ export class TicketService extends DataBaseService<TicketDocument> {
 
         // Note: assignedTo field removed from frontend interface
 
-        // Enhance messages with sender info
+        // Enhance messages with sender info and ensure attachment details are included
         if (ticketObj.messages && ticketObj.messages.length > 0) {
             ticketObj.messages = await Promise.all(
                 ticketObj.messages.map(async (message: any) => {
                     const senderInfo = await this.getUserInfo(message.sender);
+                    
+                    // Ensure attachment details are properly formatted
+                    let attachmentDetails = message.attachmentDetails || [];
+                    if (message.attachments && message.attachments.length > 0 && attachmentDetails.length === 0) {
+                        // Fallback: get attachment details from attachment service
+                        try {
+                            attachmentDetails = await this.attachmentService.getAttachmentDetails(message.attachments);
+                        } catch (error) {
+                            console.warn('Could not fetch attachment details:', error);
+                            attachmentDetails = [];
+                        }
+                    }
+                    
                     return {
                         ...message,
                         senderName: senderInfo ? this.getDisplayName(senderInfo) : 'Unknown User',
-                        senderEmail: senderInfo?.email || ''
+                        senderEmail: senderInfo?.email || '',
+                        attachmentDetails: attachmentDetails
                     };
                 })
             );

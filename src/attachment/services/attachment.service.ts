@@ -216,14 +216,14 @@ export class AttachmentService {
   }
 
   /**
-   * Move file to permanent uploads directory (keeping in temp for now)
+   * Move file to permanent uploads directory
    */
   private async moveToPermanentDirectory(
     tempFilePath: string,
     originalName: string
   ): Promise<{ url: string; filePath: string; fileName: string; size: number }> {
-    // Use the configured temp directory
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'temp');
+    // Use the attachments directory
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'attachments');
     
     // Ensure directory exists
     if (!fs.existsSync(uploadsDir)) {
@@ -244,7 +244,7 @@ export class AttachmentService {
     const stats = fs.statSync(finalPath);
     
     return {
-      url: `/uploads/temp/${fileName}`,
+      url: `/uploads/attachments/${fileName}`,
       filePath: finalPath,
       fileName: fileName,
       size: stats.size

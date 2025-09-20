@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiResponse } from '@nestjs/swagger';
 import { AuthenticatedUser, Public } from 'nest-keycloak-connect';
 import { EmailService } from './notifications/services/email.service';
+import { RecaptchaService } from './shared/services/recaptcha.service';
 
 @Controller('')
 
@@ -11,13 +12,21 @@ export class AppController {
   version = "1.0.0"
   constructor(
     private configService: ConfigService,
-    private emailService: EmailService
+    private emailService: EmailService,
+    private recaptchaService: RecaptchaService
   ) {}
     @Get()
     @ApiResponse({status: HttpStatus.OK, description: "The route displaying the application version"})
     @ApiResponse({status: HttpStatus.UNAUTHORIZED, description: "The request did not authenticate with keycloak"})
     getMainRoad(): string {
       return `Y-Nkap API Version ${this.configService.get<string>("NODE_ENV")} ${this.version}`;
+    }
+
+    @Get('recaptcha/site-key')
+    @Public()
+    @ApiResponse({status: HttpStatus.OK, description: "Get reCAPTCHA site key"})
+    getRecaptchaSiteKey(): { siteKey: string } {
+      return { siteKey: this.recaptchaService.getSiteKey() };
     }
 
     // Email test endpoint - commented out after successful configuration

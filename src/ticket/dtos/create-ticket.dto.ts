@@ -53,4 +53,13 @@ export class CreateTicketDTO {
     @IsArray()
     @IsString({ each: true })
     attachments?: string[];
+
+    @ApiProperty({
+        description: "CAPTCHA token for bot protection",
+        required: false,
+        type: String
+    })
+    @IsOptional()
+    @IsString()
+    captchaToken?: string;
 }
