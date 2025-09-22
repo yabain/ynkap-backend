@@ -237,8 +237,19 @@ export class TicketService extends DataBaseService<TicketDocument> {
      * @returns Array of tickets with user details
      */
     async getTicketsForUser(req: any): Promise<EnhancedTicket[]> {
-        const roles = req['user']['realm_access']['roles'];
-        const userId = req['user']['sub'];
+        // Extract user info from JWT token
+        const user = req['user'] || req.user;
+        if (!user) {
+            console.log('🔍 Service: No user found in request');
+            return [];
+        }
+        
+        const roles = user['realm_access']?.['roles'] || user.roles || [];
+        const userId = user['sub'] || user.id;
+
+        console.log('🔍 Service: getTicketsForUser called');
+        console.log('🔍 Service: User ID:', userId);
+        console.log('🔍 Service: User roles:', roles);
 
         // Check if user is a solver/agent (has any solver role)
         const isSolver = roles.some(role =>
@@ -247,19 +258,44 @@ export class TicketService extends DataBaseService<TicketDocument> {
             role.includes('admin')
         );
 
+        console.log('🔍 Service: Is solver:', isSolver);
+
         let tickets: Ticket[] = [];
+        let query: any;
 
         if (isSolver) {
             // For solvers/agents, show both tickets they created AND tickets assigned to them
-            tickets = await this.findByField({
+            query = {
                 $or: [
                     { user: userId },        // Tickets they created
                     { assignTo: userId }     // Tickets assigned to them
                 ]
-            });
+            };
         } else {
             // For regular users, show only tickets they created
-            tickets = await this.findByField({ user: userId });
+            query = { user: userId };
+        }
+
+        console.log('🔍 Service: Database query:', JSON.stringify(query, null, 2));
+        
+        // First, let's check if ANY tickets exist in the database
+        const allTickets = await this.findByField({});
+        console.log('🔍 Service: Total tickets in database:', allTickets.length);
+        
+        if (allTickets.length > 0) {
+            console.log('🔍 Service: Sample ticket owners:', allTickets.slice(0, 3).map(t => ({ id: t._id, user: t.user, assignTo: t.assignTo })));
+        }
+        
+        tickets = await this.findByField(query);
+        
+        console.log('🔍 Service: Raw tickets from DB:', tickets.length);
+        if (tickets.length > 0) {
+            console.log('🔍 Service: First ticket sample:', {
+                id: tickets[0]._id,
+                user: tickets[0].user,
+                assignTo: tickets[0].assignTo,
+                title: tickets[0].title
+            });
         }
 
         console.log('User roles:', roles);

@@ -36,6 +36,42 @@ export class TicketController {
         return await this.ticketService.createTicket(createTicketDtos,req)
     }
 
+    @Get('/test')
+    async testEndpoint(@Req() req: Request) {
+        console.log('🧪 TEST ENDPOINT CALLED');
+        console.log('🧪 User from token:', req['user']?.['sub']);
+        console.log('🧪 Authorization header present:', !!req.headers?.['authorization']);
+        return { 
+            message: 'Test endpoint working', 
+            timestamp: new Date(),
+            userId: req['user']?.['sub'],
+            hasAuth: !!req.headers?.['authorization']
+        };
+    }
+
+    @Get('/debug/tickets')
+    async debugTickets(@Req() req: Request) {
+        console.log('🔍 DEBUG: Getting all tickets for debugging');
+        const allTickets = await this.ticketService.findByField({});
+        const userInfo = {
+            userId: req['user']?.['sub'],
+            roles: req['user']?.['realm_access']?.['roles']
+        };
+        
+        return {
+            userInfo,
+            totalTickets: allTickets.length,
+            tickets: allTickets.map(t => ({
+                id: t._id,
+                title: t.title,
+                user: t.user,
+                assignTo: t.assignTo,
+                status: t.status,
+                createdAt: t.createdAt
+            }))
+        };
+    }
+
     @Get('/user')
     @CustomMessage("List of tickets successfully retrieved for this user")
     @ApiOperation({
@@ -47,7 +83,18 @@ export class TicketController {
     @ApiResponse({status: HttpStatus.INTERNAL_SERVER_ERROR, description: "An unexpected error occurred"})
 
     async getTicketsForUser(@Req() req: Request) {
-        return await this.ticketService.getTicketsForUser(req);
+        console.log('🔍 Controller: getTicketsForUser called');
+        console.log('🔍 Authorization header:', req.headers?.['authorization'] ? 'Present' : 'Missing');
+        console.log('🔍 User object exists:', !!req['user']);
+        console.log('🔍 User from req.user:', !!req.user);
+        console.log('🔍 User ID from request:', req['user']?.['sub'] || req.user?.['sub']);
+        console.log('🔍 User roles:', req['user']?.['realm_access']?.['roles'] || req.user?.['realm_access']?.['roles']);
+        console.log('🔍 Full user object keys:', Object.keys(req['user'] || req.user || {}));
+        
+        const result = await this.ticketService.getTicketsForUser(req);
+        console.log('🔍 Controller: Returning', result?.length || 0, 'tickets');
+        
+        return result;
     }
 
     @Get(':id')
