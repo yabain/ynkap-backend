@@ -1,0 +1,22 @@
+[
+  {
+    "id": "general_help",
+    "keywords": ["help", "support", "assistance", "guide"],
+    "content": "I'm here to help you with any questions or issues you might have. Please describe what you need assistance with."
+  },
+  {
+    "id": "technical_support",
+    "keywords": ["error", "bug", "issue", "problem", "not working", "broken"],
+    "content": "I can help you troubleshoot technical issues. Please provide details about the error message or problem you're experiencing."
+  },
+  {
+    "id": "account_help",
+    "keywords": ["account", "login", "password", "profile", "settings"],
+    "content": "For account-related issues, I can guide you through login problems, password resets, or profile settings."
+  },
+  {
+    "id": "feature_info",
+    "keywords": ["feature", "how to", "tutorial", "guide", "instructions"],
+    "content": "I can explain how to use various features and provide step-by-step instructions for common tasks."
+  }
+]

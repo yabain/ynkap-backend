@@ -53,6 +53,29 @@ export class TicketService extends DataBaseService<TicketDocument> {
     }
 
     /**
+     * Update existing tickets without priority field to have default 'Low' priority
+     * This method should be called once to migrate old tickets
+     */
+    async migratePriorityField(): Promise<void> {
+        try {
+            const result = await this.ticketModel.updateMany(
+                {
+                    $or: [
+                        { priority: { $exists: false } },
+                        { priority: 0 },
+                        { priority: null },
+                        { priority: { $nin: ['High', 'Medium', 'Low'] } }
+                    ]
+                },
+                { $set: { priority: 'Low' } }
+            );
+            console.log(`Updated ${result.modifiedCount} tickets with default priority 'Low'`);
+        } catch (error) {
+            console.error('Error migrating priority field:', error);
+        }
+    }
+
+    /**
      * Create a new ticket
      * @param createTicketDto Ticket creation data
      * @param req Request object containing user information
@@ -286,7 +309,18 @@ export class TicketService extends DataBaseService<TicketDocument> {
             console.log('🔍 Service: Sample ticket owners:', allTickets.slice(0, 3).map(t => ({ id: t._id, user: t.user, assignTo: t.assignTo })));
         }
         
-        tickets = await this.findByField(query);
+        // Sort by newest first (createdAt descending) and ensure priority field exists
+        tickets = await this.ticketModel.find(query)
+            .sort({ createdAt: -1 })
+            .exec();
+        
+        // Ensure all tickets have priority field (default to 'Low' for old tickets)
+        tickets = tickets.map(ticket => {
+            if (!ticket.priority) {
+                ticket.priority = 'Low';
+            }
+            return ticket;
+        });
         
         console.log('🔍 Service: Raw tickets from DB:', tickets.length);
         if (tickets.length > 0) {
@@ -357,7 +391,24 @@ export class TicketService extends DataBaseService<TicketDocument> {
     async getTicketsByStatus(req: any, status: string): Promise<EnhancedTicket[]> {
         const roles = req['user']['realm_access']['roles'];
         const userId = req['user']['sub'];
-        const normalizedStatus = status.toUpperCase() as TicketStatus;
+        
+        // Normalize status to handle both old and new status values
+        let normalizedStatus: TicketStatus;
+        switch (status.toUpperCase()) {
+            case 'OPEN':
+                normalizedStatus = TicketStatus.OPENED;
+                break;
+            case 'SOLVE':
+                normalizedStatus = TicketStatus.SOLVED;
+                break;
+            case 'CLOSE':
+                normalizedStatus = TicketStatus.CLOSED;
+                break;
+            default:
+                normalizedStatus = status.toUpperCase() as TicketStatus;
+        }
+
+        console.log(`🔍 getTicketsByStatus - Original status: ${status}, Normalized: ${normalizedStatus}`);
 
         // Check if user is a solver/agent (has any solver role)
         const isSolver = roles.some(role =>
@@ -370,26 +421,41 @@ export class TicketService extends DataBaseService<TicketDocument> {
 
         if (isSolver) {
             // For solvers/agents, show both tickets they created AND tickets assigned to them
-            tickets = await this.findByField({
+            tickets = await this.ticketModel.find({
                 $or: [
                     { user: userId },        // Tickets they created
                     { assignTo: userId }     // Tickets assigned to them
                 ],
                 status: normalizedStatus
-            });
+            })
+            .sort({ createdAt: -1 })
+            .exec();
         } else {
             // For regular users, show only tickets they created
-            tickets = await this.findByField({
+            tickets = await this.ticketModel.find({
                 user: userId,
                 status: normalizedStatus
-            });
+            })
+            .sort({ createdAt: -1 })
+            .exec();
         }
+        
+        // Ensure all tickets have priority field (default to 'Low' for old tickets)
+        tickets = tickets.map(ticket => {
+            if (!ticket.priority) {
+                ticket.priority = 'Low';
+            }
+            return ticket;
+        });
 
-        console.log('User roles:', roles);
-        console.log('Is solver:', isSolver);
-        console.log('User ID:', userId);
-        console.log('Status filter:', normalizedStatus);
-        console.log('Found tickets:', tickets.length);
+        console.log('🔍 getTicketsByStatus results:', {
+            userRoles: roles,
+            isSolver: isSolver,
+            userId: userId,
+            originalStatus: status,
+            normalizedStatus: normalizedStatus,
+            foundTickets: tickets.length
+        });
 
         // Enhance tickets with user information
         const enhancedTickets = await Promise.all(

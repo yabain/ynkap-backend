@@ -34,7 +34,8 @@
     "test:mtn-connectivity": "cross-env NODE_ENV=prod ts-node -r tsconfig-paths/register src/scripts/test-mtn-connectivity.ts",
     "test:wallet-payment": "ts-node -r tsconfig-paths/register src/scripts/test-wallet-payment.ts",
     "seed:transactions-simple": "ts-node -r tsconfig-paths/register src/scripts/seed-transactions-simple.ts",
-    "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts"
+    "scripts:manager": "ts-node -r tsconfig-paths/register src/scripts/script-manager.ts",
+    "migrate:ticket-priority": "ts-node -r tsconfig-paths/register src/scripts/migrate-ticket-priority.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.884.0",

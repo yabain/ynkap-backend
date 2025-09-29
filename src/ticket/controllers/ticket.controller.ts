@@ -7,6 +7,7 @@ import { TransformResponeInterceptor } from "src/shared/interceptors/transform-r
 import { ObjectIDValidationPipe } from "src/shared/pipes/objectID.pipe";
 import { UpdateStatusTicketDTO } from "../dtos/update-status-ticket.dto";
 import { TicketTypes } from "../enums/ticket-types.enum";
+import { TicketStatus } from "../enums/ticket-status.enum";
 import { Request } from "express"
 
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
@@ -58,9 +59,18 @@ export class TicketController {
             roles: req['user']?.['realm_access']?.['roles']
         };
         
+        // Count tickets by status
+        const statusCounts = {
+            OPENED: allTickets.filter(t => t.status === TicketStatus.OPENED).length,
+            IN_PROGRESS: allTickets.filter(t => t.status === TicketStatus.IN_PROGRESS).length,
+            SOLVED: allTickets.filter(t => t.status === TicketStatus.SOLVED).length,
+            CLOSED: allTickets.filter(t => t.status === TicketStatus.CLOSED).length
+        };
+        
         return {
             userInfo,
             totalTickets: allTickets.length,
+            statusCounts,
             tickets: allTickets.map(t => ({
                 id: t._id,
                 title: t.title,

@@ -23,6 +23,7 @@ import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
 import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.interceptor';
 import { LogsModule } from './logs/logs.module';
 import { SharedModule } from './shared/shared.module';
+import { AiModule } from './ai/ai.module';
 
 
 @Module({
@@ -94,7 +95,8 @@ import { SharedModule } from './shared/shared.module';
     AuthModule,
     UserModule,
     DashboardModule,
-    SharedModule
+    SharedModule,
+    AiModule
   ],
   controllers: [AppController],
   providers: [

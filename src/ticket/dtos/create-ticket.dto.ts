@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsString, MinLength, IsOptional, IsArray, IsNumber, Min, Max } from "class-validator";
+import { IsString, MinLength, IsOptional, IsArray, IsNumber, Min, Max, IsIn } from "class-validator";
 import { TicketTypes } from "../enums/ticket-types.enum";
 import { ApiProperty } from "@nestjs/swagger";
 
@@ -42,6 +42,20 @@ export class CreateTicketDTO {
     })
     @IsOptional()
     @IsString()
+    @IsIn(['High', 'Medium', 'Low'], {
+        message: 'Priority must be one of: High, Medium, Low'
+    })
+    @Transform(({ value }) => {
+        // Ensure priority is always a valid string value
+        if (value === null || value === undefined || value === 0 || value === '') {
+            return 'Low';
+        }
+        // Ensure it's one of the valid enum values
+        if (['High', 'Medium', 'Low'].includes(value)) {
+            return value;
+        }
+        return 'Low'; // Default fallback
+    })
     priority?: 'High' | 'Medium' | 'Low';
 
     @ApiProperty({
