@@ -1,16 +1,29 @@
-import { Module } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
-import { ConfigModule } from '@nestjs/config';
-import { AiController } from './ai.controller';
+import { Module, forwardRef } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
 import { AiService } from './ai.service';
+import { AgentHandoffService } from './agent-handoff.service';
+import { AgentAvailabilityService } from '../user/services/agent-availability.service';
+import { User, UserSchema } from '../user/models/user.schema';
+import { TicketModule } from '../ticket/ticket.module';
+import { MessageModule } from '../message/message.module';
+import { TicketService } from '../ticket/services/ticket.services';
 
 @Module({
   imports: [
-    HttpModule,
-    ConfigModule,
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    forwardRef(() => TicketModule),
+    MessageModule
   ],
-  controllers: [AiController],
-  providers: [AiService],
-  exports: [AiService],
+  providers: [
+    AiService, 
+    AgentHandoffService, 
+    AgentAvailabilityService,
+    {
+      provide: 'TicketService',
+      useFactory: (ticketService: TicketService) => ticketService,
+      inject: [TicketService]
+    }
+  ],
+  exports: [AiService, AgentHandoffService, AgentAvailabilityService],
 })
 export class AiModule {}

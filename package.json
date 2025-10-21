@@ -41,6 +41,8 @@
     "@aws-sdk/client-s3": "^3.884.0",
     "@aws-sdk/s3-request-presigner": "^3.884.0",
     "@google-cloud/storage": "^7.16.0",
+    "@google/genai": "^1.25.0",
+    "@google/generative-ai": "^0.24.1",
     "@keycloak/keycloak-admin-client": "^25.0.4",
     "@nestjs/axios": "^3.0.3",
     "@nestjs/common": "^10.0.0",

@@ -12,6 +12,7 @@ import { SharedModule } from "src/shared/shared.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MessageModule } from "../message/message.module";
 import { AttachmentModule } from "../attachment/attachment.module";
+import { AiModule } from "../ai/ai.module";
 
 @Module({
     imports: [
@@ -29,7 +30,8 @@ import { AttachmentModule } from "../attachment/attachment.module";
         SharedModule,
         NotificationsModule,
         MessageModule,
-        forwardRef(() => AttachmentModule)
+        forwardRef(() => AttachmentModule),
+        forwardRef(() => AiModule)
     ],
     controllers: [TicketController],
     exports: [TicketService],

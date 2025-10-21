@@ -13,6 +13,7 @@ import { Request } from "express"
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { LogActivity } from '../../logs/interceptors/activity-logger.interceptor';
 import { LogType } from '../../logs/enums/log-type.enum';
+import { Public } from '../../auth/decorators/public.decorator';
 
 @Controller('tickets')
 @UseInterceptors(TransformResponeInterceptor)
@@ -241,5 +242,22 @@ export class TicketController {
 
     async getStatusWorkflow() {
         return await this.ticketService.getStatusWorkflow();
+    }
+
+    @Get(':id/agent-status')
+    @Public()
+    @CustomMessage('Agent availability status retrieved successfully')
+    @ApiOperation({
+        summary: "Check agent availability for a ticket",
+        description: "Check if the assigned agent is available and whether AI fallback should be used"
+    })
+    @ApiResponse({status: HttpStatus.OK, description: "Agent availability status"})
+    @ApiResponse({status: HttpStatus.NOT_FOUND, description: "Ticket not found"})
+
+    async getAgentAvailabilityStatus(
+        @Param('id', ObjectIDValidationPipe) ticketId: string,
+        @Req() req: Request
+    ) {
+        return await this.ticketService.getAgentAvailabilityStatus(ticketId, req);
     }
 }

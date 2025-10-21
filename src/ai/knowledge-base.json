@@ -1,0 +1,62 @@
+[
+  {
+    "category": "login",
+    "keywords": ["login", "password", "signin", "access", "authenticate", "forgot password"],
+    "question": "How do I log into my Y-Nkap account?",
+    "answer": "To log in: 1) Go to the Y-Nkap login page 2) Enter your email and password 3) Click 'Sign In'. If you forgot your password, use the 'Forgot Password' link to reset it."
+  },
+  {
+    "category": "transactions",
+    "keywords": ["send money", "transfer", "payment", "transaction", "pay", "wire"],
+    "question": "How can I send money through Y-Nkap?",
+    "answer": "To send money: 1) Go to 'Send Money' section 2) Enter recipient details 3) Choose amount and currency 4) Review and confirm. Transfers are usually instant within Y-Nkap network."
+  },
+  {
+    "category": "security",
+    "keywords": ["secure", "safety", "protection", "fraud", "hack", "2fa", "verification"],
+    "question": "Is my Y-Nkap account secure?",
+    "answer": "Yes, Y-Nkap uses bank-level encryption, 2FA authentication, and fraud monitoring. We never store passwords in plain text and all transactions are encrypted."
+  },
+  {
+    "category": "fees",
+    "keywords": ["fee", "cost", "charge", "price", "rate", "commission"],
+    "question": "What are Y-Nkap's fees?",
+    "answer": "Y-Nkap offers competitive rates: Local transfers are free, international transfers have low fees starting from 1%. Check our fee schedule in the app for exact rates."
+  },
+  {
+    "category": "support",
+    "keywords": ["help", "support", "contact", "assistance", "problem", "issue"],
+    "question": "How can I get help with Y-Nkap?",
+    "answer": "Get support through: 1) In-app chat support 2) Email support@y-nkap.com 3) Phone support during business hours 4) FAQ section in the app."
+  },
+  {
+    "category": "account",
+    "keywords": ["account", "profile", "settings", "update", "change", "personal"],
+    "question": "How do I update my Y-Nkap account information?",
+    "answer": "To update your account: 1) Go to 'Profile' or 'Settings' 2) Select the information you want to change 3) Make your updates 4) Save changes. Some changes may require verification."
+  },
+  {
+    "category": "limits",
+    "keywords": ["limit", "maximum", "minimum", "restriction", "daily", "monthly"],
+    "question": "What are Y-Nkap's transaction limits?",
+    "answer": "Transaction limits vary by account type and verification level. Basic accounts have daily limits, while verified accounts have higher limits. Check your specific limits in the app settings."
+  },
+  {
+    "category": "verification",
+    "keywords": ["verify", "verification", "document", "identity", "kyc", "proof"],
+    "question": "How do I verify my Y-Nkap account?",
+    "answer": "To verify your account: 1) Go to 'Account Verification' 2) Upload required documents (ID, proof of address) 3) Wait for review (usually 24-48 hours) 4) You'll be notified once verified."
+  },
+  {
+    "category": "mobile",
+    "keywords": ["app", "mobile", "phone", "download", "install", "smartphone"],
+    "question": "How do I use Y-Nkap on my phone?",
+    "answer": "Download the Y-Nkap mobile app from App Store or Google Play. The app offers all features including sending money, checking balance, and customer support."
+  },
+  {
+    "category": "business",
+    "keywords": ["business", "company", "merchant", "commercial", "enterprise"],
+    "question": "Does Y-Nkap offer business accounts?",
+    "answer": "Yes, Y-Nkap offers business accounts with features like bulk payments, API integration, and dedicated support. Contact our business team for more information."
+  }
+]

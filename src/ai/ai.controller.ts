@@ -22,7 +22,7 @@ export class AiController {
       }
 
       // Generate AI response
-      const answer = await this.aiService.generateResponse(message);
+      const answer = await this.aiService.generateResponse({ message });
 
       return {
         answer,

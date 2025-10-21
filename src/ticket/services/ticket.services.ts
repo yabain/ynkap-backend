@@ -17,12 +17,15 @@ import { NotificationType } from "../../notifications/dto/create-notification.dt
 import { TicketStatusManagementService } from "./ticket-status-management.service";
 import { AttachmentService } from "../../attachment/services/attachment.service";
 import { RecaptchaService } from "../../shared/services/recaptcha.service";
+import { AiService } from "../../ai/ai.service";
 
 /**
  * Service for handling ticket-related operations
  */
 @Injectable()
 export class TicketService extends DataBaseService<TicketDocument> {
+    private userInfoCache = new Map<string, { data: UserInfo | null, timestamp: number }>();
+    private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
     constructor(
         @InjectModel(Ticket.name) private ticketModel: Model<TicketDocument>,
@@ -34,7 +37,8 @@ export class TicketService extends DataBaseService<TicketDocument> {
         private statusManagementService: TicketStatusManagementService,
         @Inject(forwardRef(() => AttachmentService))
         private attachmentService: AttachmentService,
-        private recaptchaService: RecaptchaService
+        private recaptchaService: RecaptchaService,
+        private aiService: AiService
     ) {
         super(ticketModel, connection);
     }
@@ -337,47 +341,59 @@ export class TicketService extends DataBaseService<TicketDocument> {
         console.log('User ID:', userId);
         console.log('Found tickets:', tickets.length);
 
-        // Enhance tickets with user information
-        const enhancedTickets = await Promise.all(
-            tickets.map(async (ticket) => {
-                const ticketObj = ticket.toObject() as any;
+        // Collect unique user IDs to batch fetch user info
+        const userIds = new Set<string>();
+        tickets.forEach(ticket => {
+            userIds.add(ticket.user);
+            if (ticket.messages) {
+                ticket.messages.forEach(message => userIds.add(message.sender));
+            }
+        });
 
-                // Get creator info
-                const creatorInfo = await this.getUserInfo(ticket.user);
-                if (creatorInfo) {
-                    ticketObj.createdBy = {
-                        _id: creatorInfo._id,
-                        username: creatorInfo.username,
-                        email: creatorInfo.email,
-                        firstName: creatorInfo.firstName,
-                        lastName: creatorInfo.lastName,
-                        roles: creatorInfo.roles
-                    };
-                }
-
-                // Note: assignedTo field removed from frontend interface
-
-                // Enhance messages with sender info
-                if (ticketObj.messages && ticketObj.messages.length > 0) {
-                    ticketObj.messages = await Promise.all(
-                        ticketObj.messages.map(async (message: any) => {
-                            const senderInfo = await this.getUserInfo(message.sender);
-                            return {
-                                ...message,
-                                senderName: senderInfo ? this.getDisplayName(senderInfo) : 'Unknown User',
-                                senderEmail: senderInfo?.email || ''
-                            };
-                        })
-                    );
-                }
-
-                // Add ownership information
-                ticketObj.isOwnedByUser = ticket.user === userId;
-                ticketObj.isAssignedToUser = ticket.assignTo === userId;
-
-                return ticketObj;
+        // Batch fetch user info for all unique users
+        const userInfoMap = new Map<string, UserInfo | null>();
+        await Promise.all(
+            Array.from(userIds).map(async (id) => {
+                const info = await this.getUserInfo(id);
+                userInfoMap.set(id, info);
             })
         );
+
+        // Enhance tickets with user information
+        const enhancedTickets = tickets.map((ticket) => {
+            const ticketObj = ticket.toObject() as any;
+
+            // Get creator info from cache
+            const creatorInfo = userInfoMap.get(ticket.user);
+            if (creatorInfo) {
+                ticketObj.createdBy = {
+                    _id: creatorInfo._id,
+                    username: creatorInfo.username,
+                    email: creatorInfo.email,
+                    firstName: creatorInfo.firstName,
+                    lastName: creatorInfo.lastName,
+                    roles: creatorInfo.roles
+                };
+            }
+
+            // Enhance messages with sender info from cache
+            if (ticketObj.messages && ticketObj.messages.length > 0) {
+                ticketObj.messages = ticketObj.messages.map((message: any) => {
+                    const senderInfo = userInfoMap.get(message.sender);
+                    return {
+                        ...message,
+                        senderName: senderInfo ? this.getDisplayName(senderInfo) : 'Unknown User',
+                        senderEmail: senderInfo?.email || ''
+                    };
+                });
+            }
+
+            // Add ownership information
+            ticketObj.isOwnedByUser = ticket.user === userId;
+            ticketObj.isAssignedToUser = ticket.assignTo === userId;
+
+            return ticketObj;
+        });
 
         return enhancedTickets;
     }
@@ -700,7 +716,54 @@ export class TicketService extends DataBaseService<TicketDocument> {
     }
 
     /**
-     * Add a message to a ticket
+     * Get agent availability status for a ticket
+     * @param ticketId Ticket ID
+     * @param req Request object containing user information
+     * @returns Agent availability status and AI fallback information
+     */
+    async getAgentAvailabilityStatus(ticketId: string, req: any): Promise<any> {
+        const ticket = await this.findOneByField({ _id: ticketId });
+        if (!ticket) {
+            throw new NotFoundException(`Ticket with ID ${ticketId} not found`);
+        }
+
+        const isAgentAvailable = await this.aiService.isAgentAvailable(ticket.assignTo);
+        const areOtherAgentsAvailable = await this.aiService.areAgentsAvailable(ticket.type);
+        const shouldUseAiFallback = await this.aiService.shouldProvideAiFallback(
+            ticketId, 
+            ticket.assignTo, 
+            ticket.type,
+            ticket
+        );
+
+        return {
+            ticketId,
+            assignedAgentId: ticket.assignTo,
+            isAssignedAgentAvailable: isAgentAvailable,
+            areOtherAgentsAvailable,
+            shouldUseAiFallback,
+            hasAiResponse: ticket.hasAiResponse || false,
+            lastAgentActivity: ticket.lastAgentActivity,
+            ticketStatus: ticket.status
+        };
+    }
+
+    /**
+     * Check if assigned agent is available using the agent availability service
+     * @param agentId Agent user ID
+     * @returns true if agent is online and active
+     */
+    async isAgentAvailable(agentId: string): Promise<boolean> {
+        try {
+            return await this.aiService.isAgentAvailable(agentId);
+        } catch (error) {
+            console.error('Error checking agent availability:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Add a message to a ticket with AI fallback
      * @param ticketId Ticket ID
      * @param messageDto Message data
      * @param req Request object containing user information
@@ -746,6 +809,58 @@ export class TicketService extends DataBaseService<TicketDocument> {
         }
 
         await ticket.save();
+
+        // Check if message is from ticket owner and provide AI fallback if needed
+        if (isUserTicketOwner) {
+            console.log('🤖 Message from ticket owner, checking AI fallback...');
+            console.log('🤖 Ticket ID:', ticketId);
+            console.log('🤖 Assigned agent:', ticket.assignTo);
+            console.log('🤖 Ticket type:', ticket.type);
+            
+            const shouldProvideAiFallback = await this.aiService.shouldProvideAiFallback(
+                ticketId, 
+                ticket.assignTo, 
+                ticket.type,
+                ticket
+            );
+            
+            console.log('🤖 Should provide AI fallback:', shouldProvideAiFallback);
+            
+            if (shouldProvideAiFallback) {
+                console.log('🤖 Generating AI response...');
+                // Generate AI response
+                const aiResponse = await this.aiService.generateResponse({
+                    message: messageDto.content,
+                    ticketType: ticket.type,
+                    ticketId: ticketId
+                });
+                
+                console.log('🤖 AI response generated:', aiResponse.substring(0, 100) + '...');
+                
+                // Add AI message to ticket
+                const aiMessage = {
+                    sender: 'ai_bot',
+                    content: aiResponse,
+                    createdAt: new Date(),
+                    attachments: [],
+                    relatedFaqs: [],
+                    attachmentDetails: [],
+                    isAiResponse: true
+                };
+                
+                ticket.messages.push(aiMessage);
+                ticket.hasAiResponse = true;
+                await ticket.save();
+                console.log('🤖 AI message added to ticket');
+            } else {
+                console.log('🤖 No AI fallback needed, updating agent activity');
+                // Update last agent activity timestamp
+                ticket.lastAgentActivity = new Date();
+                await ticket.save();
+            }
+        } else {
+            console.log('🤖 Message not from ticket owner, skipping AI check');
+        }
 
         // Send notification to the other party (not the sender)
         const recipientId = isUserTicketOwner ? ticket.assignTo : ticket.user;
@@ -822,19 +937,22 @@ export class TicketService extends DataBaseService<TicketDocument> {
      * @returns User information with email and username
      */
     public async getUserInfo(userId: string): Promise<UserInfo | null> {
+        // Check cache first
+        const cached = this.userInfoCache.get(userId);
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+            return cached.data;
+        }
+
         const maxRetries = 3;
-        const retryDelay = 1000; // 1 second
+        const retryDelay = 1000;
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                console.log(` Attempting to get user info for ${userId} (attempt ${attempt}/${maxRetries})`);
-
-                // Use the Keycloak API to get user details
                 const userDetails = await this.keycloakApiService.getUserById(userId);
 
+                let userInfo: UserInfo | null = null;
                 if (userDetails) {
-                    console.log(` Successfully retrieved user info for ${userId}`);
-                    return {
+                    userInfo = {
                         _id: userId,
                         username: userDetails.username || `User ${userId}`,
                         email: userDetails.email || `user-${userId}@example.com`,
@@ -844,25 +962,20 @@ export class TicketService extends DataBaseService<TicketDocument> {
                     };
                 }
 
-                console.log(` User details not found for ${userId}`);
-                return null;
+                this.userInfoCache.set(userId, { data: userInfo, timestamp: Date.now() });
+                return userInfo;
 
             } catch (error) {
-                console.error(` Attempt ${attempt} failed for user ${userId}:`, error.message);
-
-                // Check if it's a network/server error that might be temporary
                 const isRetryableError = error.code === 'ECONNRESET' ||
                                        error.response?.status >= 500 ||
                                        error.message.includes('socket hang up') ||
                                        error.message.includes('Proxy Error');
 
                 if (attempt === maxRetries || !isRetryableError) {
-                    console.error(` ${isRetryableError ? 'All retries failed' : 'Non-retryable error'} for user ${userId}`);
+                    this.userInfoCache.set(userId, { data: null, timestamp: Date.now() });
                     return null;
                 }
 
-                // Wait before retrying
-                console.log(` Waiting ${retryDelay}ms before retry...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             }
         }

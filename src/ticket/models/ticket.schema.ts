@@ -90,6 +90,12 @@ export class Ticket extends Document {
         status: string;
     }[];
 
+    @Prop({default: false})
+    hasAiResponse: boolean;
+
+    @Prop({default: null})
+    lastAgentActivity: Date;
+
 }
 
 export const TicketSchema = SchemaFactory.createForClass(Ticket);
