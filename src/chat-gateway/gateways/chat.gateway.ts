@@ -125,6 +125,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect{
             console.log(`👋 AGENT OFFLINE: ${data.agentId}`);
             this.onlineAgents.delete(data.agentId);
             console.log(`✅ Online agents: ${Array.from(this.onlineAgents).join(', ')}`);
+            
+            // Handle AI takeover for agent's active tickets
+            await this.handleAgentOfflineHandoff(data.agentId);
     }
 
     isAgentOnline(agentId: string): boolean {
@@ -133,6 +136,42 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect{
 
     isAnyAgentOnline(): boolean {
         return this.onlineAgents.size > 0;
+    }
+
+    private async handleAgentOfflineHandoff(agentId: string): Promise<void> {
+        try {
+            // Find all active tickets assigned to this agent
+            const tickets = await this.ticketService.findByField({ 
+                assignTo: agentId, 
+                status: { $in: ['OPENED', 'IN_PROGRESS'] }
+            });
+            
+            for (const ticket of tickets) {
+                // Force reset conversation handler to AI
+                this.aiService.setConversationHandler(ticket._id.toString(), 'ai');
+                
+                // Simple AI takeover message
+                const messageDto = {
+                    content: "Hello! The agent is currently offline. I'm here to help you. How can I assist you?",
+                    sender: 'ai_bot',
+                    ticket: ticket._id.toString(),
+                    isReply: false,
+                    mentionedUsers: [],
+                    tags: [],
+                    isSystem: true,
+                    attachments: []
+                };
+                
+                const message = await this.messageService.createMessage(messageDto);
+                
+                // Broadcast AI takeover
+                this.server.to(ticket._id.toString()).emit('newMessage', message);
+                
+                console.log(`✅ AI takeover sent for ticket ${ticket._id.toString()}`);
+            }
+        } catch (error) {
+            console.error(`❌ Error handling agent offline handoff for ${agentId}:`, error);
+        }
     }
 
     private async sendAgentOnlineHandoff(ticketId: string, agentId: string): Promise<void> {
