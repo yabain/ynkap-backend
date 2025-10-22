@@ -1,8 +1,9 @@
-    import { Module } from "@nestjs/common";
-    import { ConfigModule, ConfigService } from "@nestjs/config";
-    import configuration from "./config/configuration";
-    import { MongooseModule } from "@nestjs/mongoose";
-    import { KeycloakModule } from "src/keycloak/keycloak.module";
+import { Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import configuration from "./config/configuration";
+import { MongooseModule } from "@nestjs/mongoose";
+import { KeycloakModule } from "src/keycloak/keycloak.module";
+import { RecaptchaService } from "./services/recaptcha.service";
 
 
     @Module({
@@ -13,25 +14,23 @@
                 isGlobal: true,
             }),
 
-            MongooseModule.forRootAsync({
-                imports:[ConfigModule],
-                inject:[ConfigService],
-                useFactory: async (configService: ConfigService) => ({
-                uri: configService.get<string>('mongoURI')
-                // Suppression des options dépréciées
-                // useNewUrlParser: true,
-                // useUnifiedTopology: true,
-                })
-            }),
-            KeycloakModule
-        ],
-        providers: [],
-        exports: [
-            KeycloakModule,
-            MongooseModule,
-            ConfigModule
-        ],
-    })
-    export class SharedModule {
+        MongooseModule.forRootAsync({
+            imports:[ConfigModule],
+            inject:[ConfigService],
+            useFactory: async (configService: ConfigService) => ({
+              uri: configService.get<string>('mongoURI')
+            })
+        }),
+        KeycloakModule
+    ],
+    providers: [RecaptchaService],
+    exports: [
+        KeycloakModule,
+        MongooseModule,
+        ConfigModule,
+        RecaptchaService
+    ],
+})
+export class SharedModule {
 
     }

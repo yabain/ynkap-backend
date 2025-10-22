@@ -7,25 +7,29 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ApplicationModule } from './application/application.module';
 import { WalletModule } from './wallet/wallet.module';
-import { MessageModule } from './message/message.module';
 import { TicketModule } from './ticket/ticket.module';
 import { GatewayModule } from './chat-gateway/gateway.module';
+import { MessageModule } from './message/message.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { FinancialTransactionModule } from './financial-transaction/financial-transaction.module';
 import { FinancialPaymentModule } from './financial-payment/financial-payment.module';
-import { LogsModule } from './logs/logs.module';
-import { ActivityLoggerMiddleware } from './logs/middleware/activity-logger.middleware';
-import { ErrorLoggerInterceptor } from './logs/interceptors/error-logger.interceptor';
-import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.interceptor';
+import { NotificationsModule } from './notifications/notifications.module';
+import { FAQModule } from './faq/faq.module';
+import { AttachmentModule } from './attachment/attachment.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { AuthModule } from './auth/auth.module';
 import { KeycloakDebugMiddleware } from './keycloak/keycloak-debug.middleware';
 import { ApplicationAuthMiddleware } from './application/middleware/application-auth.middleware';
 import { UserModule } from './user/user.module';
-import { MongooseModule } from '@nestjs/mongoose';
-import { DashboardModule } from './dashboard/dashboard.module';
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 // import { CustomKeycloakGuard } from './keycloak/custom-keycloak.guard';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ActivityLoggerInterceptor } from './logs/interceptors/activity-logger.interceptor';
+import { LogsModule } from './logs/logs.module';
+import { SharedModule } from './shared/shared.module';
+import { AiModule } from './ai/ai.module';
+
 
 @Module({
   imports: [
@@ -89,10 +93,15 @@ import { Reflector } from '@nestjs/core';
     PaymentMethodsModule,
     FinancialTransactionModule,
     FinancialPaymentModule,
+    NotificationsModule,
+    FAQModule,
+    AttachmentModule,
     LogsModule,
     AuthModule,
     UserModule,
-    DashboardModule
+    DashboardModule,
+    SharedModule,
+    AiModule
   ],
   controllers: [AppController],
   providers: [

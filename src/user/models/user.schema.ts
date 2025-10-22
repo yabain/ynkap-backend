@@ -13,6 +13,18 @@ export class User extends Document {
 
     @Prop({default: Date.now})
     createdAt: Date;
+
+    @Prop({default: 'offline', enum: ['online', 'offline', 'busy', 'away']})
+    status: 'online' | 'offline' | 'busy' | 'away';
+
+    @Prop({default: Date.now})
+    lastActive: Date;
+
+    @Prop({default: true})
+    isAvailableForTickets: boolean;
+
+    @Prop({default: 0})
+    activeTicketsCount: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -1,11 +1,18 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TicketController } from "./controllers/ticket.controller";
 import { MongooseModule } from "@nestjs/mongoose";
+import { HttpModule } from "@nestjs/axios";
 import { Ticket, TicketSchema } from "./models/ticket.schema";
 import { TicketService } from "./services/ticket.services";
 import { TicketHistoryService } from "./services/ticket-history.service";
+import { TicketStatusManagementService } from "./services/ticket-status-management.service";
+import { KeycloakApiService } from "../keycloak/keycloak-api.service";
 import { TicketStatusHistory, TicketStatusHistorySchema } from "./models/ticket-modification-history.schema";
 import { SharedModule } from "src/shared/shared.module";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { MessageModule } from "../message/message.module";
+import { AttachmentModule } from "../attachment/attachment.module";
+import { AiModule } from "../ai/ai.module";
 
 @Module({
     imports: [
@@ -19,10 +26,15 @@ import { SharedModule } from "src/shared/shared.module";
             schema: TicketStatusHistorySchema
           }
         ]),
-        SharedModule
+        HttpModule,
+        SharedModule,
+        NotificationsModule,
+        MessageModule,
+        forwardRef(() => AttachmentModule),
+        forwardRef(() => AiModule)
     ],
     controllers: [TicketController],
     exports: [TicketService],
-    providers: [TicketService, TicketHistoryService]
+    providers: [TicketService, TicketHistoryService, TicketStatusManagementService, KeycloakApiService]
 })
 export class TicketModule{}

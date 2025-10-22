@@ -3,11 +3,33 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { GlobalExceptionFilter } from './shared/filters/global-exception.filter';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug'],
+
+  // const httpsOptions = {
+  //   key: fs.readFileSync('./secrets/cert.key'),
+  //   cert: fs.readFileSync('./secrets/cert.crt'),
+  // }
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    
+    // httpsOptions
   });
+
+  // Serve static files from uploads directory
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
+
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true, // Supprime automatiquement les propriétés non spécifiées dans le DTO, ce qui aide à éviter la pollution des donnés  
+    forbidNonWhitelisted: true, // Lève une erreur si des propriétés non spécifiées sont présentes dans l'objet de la requête
+    transform: true, // Transforme le payload de la requête en instance de classe DTO, permettant ainsi la validation de types plus complexes
+  }));
+
+  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.enableCors();
   
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') : true,

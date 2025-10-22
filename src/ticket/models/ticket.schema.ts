@@ -22,13 +22,16 @@ export class Ticket extends Document {
     @Prop({required: true})
     title: string;
     
+    @Prop({required: true, unique: true, default: () => `TKT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`})
+    refNumber: string;
+    
     @Prop({required: true})
     description: string;
 
-    @Prop({required:true})
+    @Prop({required: true})
     type: TicketTypes;
 
-    @Prop({default: TicketStatus.OPEN})
+    @Prop({default: TicketStatus.OPENED})
     status: TicketStatus;
 
     @Prop({required: true})
@@ -43,6 +46,59 @@ export class Ticket extends Document {
     @Prop({required: true})
     assignTo: string;
 
+    @Prop({default: []})
+    messages: {
+        sender: string;
+        content: string;
+        createdAt: Date;
+        attachments?: string[];
+        relatedFaqs?: string[];
+    }[];
+
+    @Prop({default: []})
+    attachments: string[];
+
+    @Prop({default: []})
+    relatedFaqs: string[];
+
+    @Prop({default: null})
+    resolutionDate: Date;
+
+    @Prop({default: null})
+    resolutionNotes: string;
+
+    @Prop({default: null})
+    rejectionReason: string;
+
+    @Prop({default: 'Low', enum: ['High', 'Medium', 'Low']})
+    priority: 'High' | 'Medium' | 'Low';
+
+    @Prop({default: []})
+    tags: string[];
+
+    @Prop({default: false})
+    isUrgent: boolean;
+
+    @Prop({default: false})
+    isEscalated: boolean;
+
+    @Prop({default: []})
+    notificationHistory: {
+        type: string;
+        recipients: string[];
+        createdAt: Date;
+        status: string;
+    }[];
+
+    @Prop({default: false})
+    hasAiResponse: boolean;
+
+    @Prop({default: null})
+    lastAgentActivity: Date;
+
 }
 
 export const TicketSchema = SchemaFactory.createForClass(Ticket);
+
+// Add unique index on refNumber
+TicketSchema.index({ refNumber: 1 }, { unique: true });

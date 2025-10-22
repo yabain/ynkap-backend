@@ -14,7 +14,7 @@ export class KeycloakConfigService implements KeycloakConnectOptionsFactory {
             clientId: this.configService.get<string>('KEYCLOAK_SERVER_CLIENTID'),
             secret: this.configService.get<string>('KEYCLOAK_SERVER_SECRET'),
             policyEnforcement: PolicyEnforcementMode.PERMISSIVE,
-            tokenValidation: TokenValidation.ONLINE
+            tokenValidation: TokenValidation.OFFLINE
         }
     }
 }

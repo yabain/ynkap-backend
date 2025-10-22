@@ -3,6 +3,37 @@ export default () => ({
     mongoURI: process.env.MONGO_DATABASE_URL,
     NODE_ENV:process.env.NODE_ENV,
     KEYCLOAK_SERVER_URI: process.env.KEYCLOAK_SERVER_URI,
+    KEYCLOAK_SERVER_REALM: process.env.KEYCLOAK_SERVER_REALM,
+    KEYCLOAK_CLIENT_UUID: process.env.KEYCLOAK_CLIENT_UUID,
+    // Keycloak Admin API (already configured)
+    // TICKET_ASSIGNMENT_CLIENT_ID: process.env.TICKET_ASSIGNMENT_CLIENT_ID,
+    // TICKET_ASSIGNMENT_CLIENT_SECRET: process.env.TICKET_ASSIGNMENT_CLIENT_SECRET,
+    // Email Configuration
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) || 587,
+    SMTP_SECURE: process.env.SMTP_SECURE === 'true',
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASS: process.env.SMTP_PASS,
+
+
+    // AWS S3 Configuration
+    AWS_REGION: process.env.AWS_REGION || 'eu-west-3',
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    AWS_S3_BUCKET_NAME: process.env.AWS_S3_BUCKET_NAME,
+    AWS_S3_PUBLIC_URL: process.env.AWS_S3_PUBLIC_URL,
+
+    // File Upload Configuration
+    MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE, 10) || 52428800, // 50MB
+    MAX_FILES_PER_UPLOAD: parseInt(process.env.MAX_FILES_PER_UPLOAD, 10) || 10,
+    TEMP_DIR: process.env.TEMP_DIR || './uploads/temp',
+
+    // File Validation
+    CHECK_FILE_SIGNATURE: process.env.CHECK_FILE_SIGNATURE === 'true',
+    SCAN_FOR_VIRUSES: process.env.SCAN_FOR_VIRUSES === 'true',
+    SMTP_FROM_EMAIL: process.env.SMTP_FROM_EMAIL,
+    SMTP_TEST_EMAIL: process.env.SMTP_TEST_EMAIL,
+    FRONTEND_URL: process.env.FRONTEND_URL,
     //MOMO API
     MOMO_API_DEFAULT_UUID:process.env.MOMO_API_DEFAULT_UUID,  
     MOMO_API_PRIMARY_KEY:process.env.MOMO_API_PRIMARY_KEY,   
